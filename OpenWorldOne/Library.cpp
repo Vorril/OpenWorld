@@ -47,7 +47,7 @@ std::tuple <GLuint, bool, const char*> Test = textureLib::textureUnit(0, false, 
 
 //////////////////////ModelLib////////////////////////
 namespace modelLib{
-std::tuple<vec4VBO*, bool, const char*> Slime = modelLib::modelUnit(nullptr, false, "Models/slime.obj");
+std::tuple<vec4VBO*, bool, const char*> Slime = modelLib::modelUnit(nullptr, false, "Models/slime.mdl");
 
 
 	vec4VBO* fetchModel(resource enumCode){
