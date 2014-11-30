@@ -253,9 +253,6 @@ void initialize(){
 	ground.loadTerrain("Textures/Terrain/testTerrain3.tga", 32.0f, 32.0f, 3.5f, 16.0f);
 	ground.texture = textureLib::fetchTexture(resource::NULL_ENUM);
 	glBindTexture(GL_TEXTURE_2D, ground.texture);
-	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
 	glBindTexture(GL_TEXTURE_2D, 0);
 
 ///TEMP/////////
