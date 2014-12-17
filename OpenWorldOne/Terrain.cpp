@@ -1,6 +1,6 @@
 #include "Terrain.h"
 
-#define terrain(x, y) terrainLinear[(int)((x)*width + y)]
+#define terrain(x, y) terrainLinear[(int)((x)*height + y)]
 
 unsigned char * Terrain::terrainLinear = nullptr;
 
@@ -18,7 +18,7 @@ Terrain::~Terrain()
 //Nevermind the +1s in the triangle work out, a 128 pixelwidth makes 127 squares
 void Terrain::loadTerrain(const char* file, float unitsWide, float unitsLength, float maxDepth,
 	float textureRepeats, float xOffset, float zOffset){
-
+	
 	if (zOffset == -1.0f) zOffset = -unitsLength / 2.0f;
 	if (xOffset == -1.0f) xOffset = -unitsWide / 2.0f;
 
@@ -42,16 +42,38 @@ void Terrain::loadTerrain(const char* file, float unitsWide, float unitsLength, 
 			surfaceMesh.texCoords.push_back(vector2((w + 1)*(textureRepeats / width), (h + 1)*(textureRepeats / height)));
 		}
 	}
-	
+	//assign vars to the object
+	xGridUnits = width;
+	zGridUnits = height;
+	this->xOffset = xOffset;
+	this->zOffset = zOffset;
+	xUnitsWide = unitsWide;
+	zUnitsWide = unitsLength;
+	depth = maxDepth;
+
+	//gen buffers
 	surfaceMesh.genVertBuffer(GL_STATIC_DRAW);//draw and draw arb have same code
 	surfaceMesh.genUVBuffer();
 
-
+	//TODO
+	//normal calcs
 
 	//delete[] terrainLinear;//may be supposed to call soil_free_image_data(terrainLinear)
-	SOIL_free_image_data(terrainLinear);
+//	SOIL_free_image_data(terrainLinear);
 
 }
+
+float Terrain::getLocalHeight(float worldX, float worldZ){
+	float terrX = worldX - this->xOffset;
+	float terrZ = worldZ - this->zOffset;
+	int xCoord = floorf((terrX / xUnitsWide)*xGridUnits); //floor >> 0 to gridUnits-1
+	int zCoord = floorf((terrZ / zUnitsWide)*zGridUnits);
+	//terrain(x, y) terrainLinear[(x)*width + z]
+
+	return terrainLinear[(xCoord*zGridUnits) + zCoord]*(depth / 255.0f);
+
+}
+
 
 void Terrain::draw(GLuint * shaderProgram){
 	glUseProgram(*shaderProgram);

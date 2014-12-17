@@ -40,6 +40,14 @@ void vec4VBO::genVertBuffer(unsigned int hint){
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
 }
 
+//call this when the vbo has grown in length and refresh when it has not
+void vec4VBO::regenVertBuffer(unsigned int hint){
+	glBindBuffer(GL_ARRAY_BUFFER, VERT_BUFF_ID);
+	glBufferData(GL_ARRAY_BUFFER, 4 * sizeof(float)* verticies.size(),
+		verticies.data(),
+		hint);
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+}
 //Call when updating, could be private
 //Only updates verts
 void vec4VBO::refreshVBOdata(){

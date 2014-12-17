@@ -1,6 +1,7 @@
 #include <iostream>
 #include <GL/glew.h>//using the d library nd dll
 #include <GL/glfw3.h> // includes windows.h
+#include <math.h>
 
 //My classes:
 #include <Shader.h>
@@ -24,25 +25,31 @@ TODO
 void checkMouse();
 void window_size_callback(GLFWwindow* windowP, int width, int height);
 void scroll_callback(GLFWwindow* windowP, double xpos, double ypos);
+void mouse_button_callback(GLFWwindow* windowP, int button, int action, int mods);
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /////// CONSTANTS & VARIABLES ///////////
 ////////////////////////////////////////////////////////////////
 // UNLIKELY TO KEEP(HERE)// TEMP VARS ////
 ///////////////////////////////////////////////
-float FoV = 56.0f;//degrees
-float degreesPerPixelVert = 1.0f;
-float degreesPerPixelHorz = 1.0f;//fov relation useful for mouse movement
+vec4VBO lines;
+float spread = 1.05f;
 
 WorldObject testSlime;
 WorldObject testSlimeTwo;
 
 bool tempbool = false;
+bool tbool = false;
 ////////////////////////////////////////////////
 //// PERMANENT VARS /////
 ////////////////////////////////////////////////
+float FoV = 56.0f;//degrees
+float degreesPerPixelVert = 1.0f;
+float degreesPerPixelHorz = 1.0f;//fov relation useful for mouse movement
+
 Camera camera;
 Shader pvOnlyShader; // could hold shaders elsewhere
+Shader pvSolidColorShader;
 Shader modelTexShader;
 Terrain ground; 
 
@@ -75,18 +82,30 @@ void display(){
 	if (!paused)checkMouse();
 
 	camera.moveCameraUnbound(7.10f*deltaT);
+	camera.cameraPosition.coords[1] = ground.getLocalHeight(camera.cameraPosition.coords[0], camera.cameraPosition.coords[2]) +0.6f;//clean
 	camera.update();
 
 
 	//DRAW:
 	//TODO: Organize by shader used etc
-	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);///!!!//TEMP//!!!///
+	if (tbool)
+	glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);///!!!//TEMP//!!!///
 	glBindSampler(0, pvOnlyShader.sampler);
 	ground.draw(&pvOnlyShader.theProgram);
+	if (tbool)
+	glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);///!!!//TEMP//!!!///
 	
-	//glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);///!!!//TEMP//!!!///
-	
-	
+	//draw temp
+	glLineWidth(2.3f);
+	glUseProgram(pvSolidColorShader.theProgram);
+	glEnableVertexAttribArray(0); // position
+	glBindBuffer(GL_ARRAY_BUFFER, lines.VERT_BUFF_ID);
+	glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 0, (void*)0);
+	glDrawArrays(GL_LINES, 0, lines.verticies.size());
+	glUseProgram(0);
+	glLineWidth(1.0f);
+
+
 	//draw worldobjects
 	countTemp++; countTemp %= 360;
 	testSlime.modelMat[3] = 5 * cos(countTemp*radiansPerDegree);
@@ -138,6 +157,8 @@ static void key_callback(GLFWwindow* windowP, int key, int scancode, int action,
 			else{
 				camera.cameraPosition[1] += 0.5f;
 			}
+	//Movekeys:
+			{ 
 			break;
 		case 65://a
 			camera.keyDownCode += 1;
@@ -151,16 +172,24 @@ static void key_callback(GLFWwindow* windowP, int key, int scancode, int action,
 		case 83://s
 			camera.keyDownCode += 8;
 			break;
+			}
+	//Misc keys:
+		case 69://e
+			tbool = !tbool;
+			break;
 		case 256://esc
 			if (paused) { glfwSetInputMode(window.primaryWindow, GLFW_CURSOR, GLFW_CURSOR_HIDDEN); }
 			else { glfwSetInputMode(window.primaryWindow, GLFW_CURSOR, GLFW_CURSOR_NORMAL); }
 			paused = !paused;
+			break;
 		case 81://q
-			tempbool = !tempbool;
-			if (tempbool) glDisable(GL_MULTISAMPLE);
-			else glEnable(GL_MULTISAMPLE);
+			//tempbool = !tempbool;
+			//if (tempbool) glDisable(GL_MULTISAMPLE);
+			//else glEnable(GL_MULTISAMPLE);
+			cout <<  ground.getLocalHeight(camera.cameraPosition.coords[0], camera.cameraPosition.coords[2]) << endl;
 			break;
 		default:
+			cout << key << endl;
 			break;
 		}//switch
 
@@ -201,6 +230,34 @@ static void checkMouse(){
 	}
 }
 
+void mouse_button_callback(GLFWwindow* windowP, int button, int action, int mods){
+	if (button == 0 && action == 1){
+		vector3 perperp = camera.lookDirection % camera.perpToLookDir;
+		for (unsigned int i = 0; i < 13; i++){
+			lines.add(camera.cameraPosition + (camera.lookDirection * -1.5f));
+			lines.add((camera.cameraPosition + (camera.lookDirection * -35.0f))
+				//+ camera.perpToLookDir*(cosf(i / 13.0f*6.283f) * spread)
+				//+ perperp*(sinf(i / 13.0f*6.283f) * spread));
+				+ camera.perpToLookDir*(spread - 2*rand()*spread / RAND_MAX)
+				+ perperp*(spread - 2*rand()*spread / RAND_MAX));
+				//+ vector3(2 * spread - rand()*spread / RAND_MAX,
+				//2 * spread - rand()*spread / RAND_MAX,
+				//2 * spread - rand()*spread / RAND_MAX));
+		}
+		lines.regenVertBuffer();
+	}
+	if (button == 1 && action == 1){
+		lines.verticies.clear();
+		lines.regenVertBuffer();
+	}
+
+}
+
+void scroll_callback(GLFWwindow* windowP, double xpos, double ypos){
+	spread += (float)ypos * 0.15f; 
+	//cout << spread << endl;
+}
+
 static void window_size_callback(GLFWwindow* windowP, int widthNew, int heightNew){
 	window.width = widthNew;
 	window.height = heightNew;
@@ -222,6 +279,7 @@ void initialize(){
 	//Create Shaders
 	pvOnlyShader.InitializeProgram("Shaders/primary.vert", "Shaders/primary.frag");//uses only PV from UBO and texture
 	modelTexShader.InitializeProgram("Shaders/modelTex.vert", "Shaders/modelTex.frag");//uses mpv and texture
+	pvSolidColorShader.InitializeProgram("Shaders/solidColor.vert", "Shaders/solidColor.frag");//uses only pv from UBO and is solid red
 	//Create Sampler(s)
 	pvOnlyShader.sampler = glGetUniformLocation(pvOnlyShader.theProgram, "diffuseSampler");
 	glSamplerParameteri(pvOnlyShader.sampler, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
@@ -237,7 +295,11 @@ void initialize(){
 	//glProgramUniform1i(modelTexShader.theProgram, modelTexShader.sampler, 0);
 
 	//Uniforms (Global UBO and misc.)
+	//Shader::setGlobalPV_UBO(&pvOnlyShader);
+	//remember that everything which uses the UBO needs tipped off to its index
 	Shader::setGlobalPV_UBO(&pvOnlyShader);
+	glUniformBlockBinding(pvSolidColorShader.theProgram, Shader::pv_UBO_index, 1);
+	glUniformBlockBinding(modelTexShader.theProgram, Shader::pv_UBO_index, 1);
 	modelTexShader.pvmUniformLoc = glGetUniformLocation(modelTexShader.theProgram, "pvm");
 
 ////Camera///////////////////
@@ -250,7 +312,7 @@ void initialize(){
 	degreesPerPixelHorz = halfHorzFoV / (window.width / 2.0f);
 
 ////Terrain//////////////////
-	ground.loadTerrain("Textures/Terrain/testTerrain3.tga", 32.0f, 32.0f, 3.5f, 16.0f);
+	ground.loadTerrain("Textures/Terrain/terrainDiag.tga", 32.0f, 32.0f, 3.5f, 16.0f);
 	ground.texture = textureLib::fetchTexture(resource::NULL_ENUM);
 	glBindTexture(GL_TEXTURE_2D, ground.texture);
 	glBindTexture(GL_TEXTURE_2D, 0);
@@ -258,10 +320,12 @@ void initialize(){
 ///TEMP/////////
 	testSlime = WorldObject(resource::SLIME);
 	testSlimeTwo = WorldObject(resource::SLIME);
+	lines.genVertBuffer();
 }
 
 void exit(){
 	glDeleteShader(pvOnlyShader.theProgram);
+	glDeleteShader(pvSolidColorShader.theProgram);
 	glDeleteShader(modelTexShader.theProgram);
 	glDeleteSamplers(1, &pvOnlyShader.sampler);
 	ground.surfaceMesh.cleanup();
@@ -301,8 +365,8 @@ int main(int argc, char **argv){
 	////////////////////////////////////////////////////////////////
 	glfwSetKeyCallback(windowGLFW, key_callback);
 	glfwSetWindowSizeCallback(windowGLFW, window_size_callback);
-	//glfwSetScrollCallback(windowGLFW, scroll_callback);
-	//glfwSetMouseButtonCallback(windowGLFW, mouse_button_callback);
+	glfwSetScrollCallback(windowGLFW, scroll_callback);
+	glfwSetMouseButtonCallback(windowGLFW, mouse_button_callback);
 
 
 
@@ -317,7 +381,7 @@ int main(int argc, char **argv){
 	glfwSetCursorPos(window.primaryWindow, window.width * 0.50, window.height * 0.50);
 
 	glEnable(GL_DEPTH_TEST);
-	glEnable(GL_CULL_FACE);
+	//glEnable(GL_CULL_FACE);
 	glEnable(GL_MULTISAMPLE);
 
 	glfwSwapInterval(1);

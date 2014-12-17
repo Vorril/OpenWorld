@@ -46,13 +46,11 @@ public:
 
 	//OGL buffering methods/////////////////////////////////////////////////////
 	void genVertBuffer(unsigned int hint = GL_DYNAMIC_DRAW);
+	void regenVertBuffer(unsigned int hint = GL_STATIC_DRAW);
 	void genUVBuffer();
 	void genNormBuffer();
 	void refreshVBOdata();
 
-	//Drawing methods/////////////////////////////////////////////////////
-	void drawGL(Shader* shader); // can shift this responsibility to the object class
-	void drawGLTex(Shader* shader);
 	
 	
 	void add(float xAdd, float yAdd, float zAdd);
