@@ -16,7 +16,7 @@ Semantics for preinitializing things are worth consideration (poss in loadscreen
 Should add unloading process in the future
 */
 
-static enum resource{NULL_ENUM, SLIME};
+static enum resource{NULL_ENUM, DEFAULT, SLIME, SPHERE, ROCK};
 
 namespace textureLib{
 	typedef std::tuple<GLuint, bool, const char*> textureUnit;

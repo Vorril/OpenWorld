@@ -36,7 +36,6 @@ public:
 	GLuint UV_BUFF_ID; 
 	GLuint NORM_BUFF_ID;
 
-	GLuint TEX_IMG;// can shift this responsibility to the object class
 
 
 	//Construction and cleanup/////////////////////////////////////////////////////

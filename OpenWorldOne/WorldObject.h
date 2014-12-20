@@ -16,10 +16,12 @@ class WorldObject
 public:
 	WorldObject();
 	WorldObject(resource enumCode);
+	WorldObject(resource modelCode, resource texCode);
 	~WorldObject();
 
 	matrix4 modelMat;
 	vec4VBO* model;
+	GLuint TEX_IMG;
 	//draw with given shader
 	void draw(GLuint* program);
 	//draw maintaining GL state bindings

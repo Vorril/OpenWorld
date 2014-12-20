@@ -11,11 +11,15 @@
 
 /*
 TODO
-- Implement model matrices//(re)consider what multiplications to do on the GPU
-- Implement movement on terrain 
-- Consider terrain view culling
-- Properly set build settings
-- Make sure calls to draw are grouped very well
++- Implement model matrices//(re)consider what multiplications to do on the GPU
+++ Implement movement on terrain 
+-- Consider terrain view culling
+++ Properly set build settings
+-- Make sure calls to draw are grouped very well
+-- Column major matrixes
+-- VAOs
+-- Gravity
+-- Implement jump as a  non instant pulse
 
 */
 
@@ -37,27 +41,41 @@ float spread = 1.05f;
 
 WorldObject testSlime;
 WorldObject testSlimeTwo;
+WorldObject testError;
+WorldObject testSphere;
 
-bool tempbool = false;
+bool tbool3 = false;
+bool tbool2 = false;
 bool tbool = false;
+
+int countTemp = 0;
+
+float gravity = 1.0f;
+float camVelocity = 0.0f;
+bool camIsJumping = false;
+double jumpTime = 0.0;
 ////////////////////////////////////////////////
 //// PERMANENT VARS /////
 ////////////////////////////////////////////////
+
+//Camera and Screen Properties
+Camera camera;
 float FoV = 56.0f;//degrees
 float degreesPerPixelVert = 1.0f;
 float degreesPerPixelHorz = 1.0f;//fov relation useful for mouse movement
 
-Camera camera;
+//Shaders
 Shader pvOnlyShader; // could hold shaders elsewhere
 Shader pvSolidColorShader;
 Shader modelTexShader;
+
+//Misc Important
 Terrain ground; 
 
 bool paused = false;
 double prevTime = 0.0;
 double deltaT = 0.0;
 
-int countTemp = 0;
 
 struct windowData{ //Data for a window, width, height,  and mouse coords etc
 	int width; int height;
@@ -81,8 +99,35 @@ void display(){
 	glfwPollEvents();
 	if (!paused)checkMouse();
 
-	camera.moveCameraUnbound(7.10f*deltaT);
-	camera.cameraPosition.coords[1] = ground.getLocalHeight(camera.cameraPosition.coords[0], camera.cameraPosition.coords[2]) +0.6f;//clean
+	if (!tbool2)//need to make all this velocity relative
+		//also consider another way of pulling out eyeHeight its too complicated
+	camera.moveCameraUnbound(7.10*deltaT);//fly
+	if (tbool2){
+		camera.moveCamera(7.10 * deltaT);//bound XZ
+		float yIntercept  = ground.getLocalHeight(camera.cameraPosition.coords[0], camera.cameraPosition.coords[2])+ 0.75f;//clean
+		
+		if (camIsJumping){
+			float yMove;
+			//camVelocity -= deltaT * gravity * 1.0f;
+			if ((prevTime - jumpTime) < 0.18){ //0.18s // prevtime is effectively currenttime
+				camVelocity = (prevTime- jumpTime) * 33.0;
+			}//pulsing
+			else{
+				camVelocity -= deltaT * gravity * 8.0f;
+			}//gravity is in control
+
+			yMove = deltaT * camVelocity;
+
+			if (yIntercept > camera.cameraPosition[1] + yMove + 0.75f){ //moved below the ground // 0.75f is eyeHeight
+				camera.translateVertTo(yIntercept);
+				camIsJumping = false;
+			}
+			else{//still above the ground
+
+			}
+		}//was jumping
+		else camera.translateVertTo(yIntercept);
+	}//bound movement
 	camera.update();
 
 
@@ -106,19 +151,18 @@ void display(){
 	glLineWidth(1.0f);
 
 
-	//draw worldobjects
+	//draw worldobjects:
+	//rotate one of the slimes
 	countTemp++; countTemp %= 360;
 	testSlime.modelMat[3] = 5 * cos(countTemp*radiansPerDegree);
 	testSlime.modelMat[11] = 5 * sin(countTemp*radiansPerDegree);
 	testSlime.modelMat = testSlime.modelMat * matrix4::makeRotateYaxis(1.0f);
 	matrix4 pvmMat = camera.PV_Matrix * (testSlime.modelMat);
 	
-	
+	//initialize pvm shader
 	glUseProgram(modelTexShader.theProgram);
 	glBindSampler(0, modelTexShader.sampler);
 	glUniformMatrix4fv(modelTexShader.pvmUniformLoc, 1, GL_TRUE, pvmMat.matrix);
-	
-
 	glEnableVertexAttribArray(0); // position
 	glEnableVertexAttribArray(1); // uv tex coords
 
@@ -127,8 +171,17 @@ void display(){
 	testSlimeTwo.modelMat = testSlimeTwo.modelMat * matrix4::makeRotateYaxis(-1.0f);
 	pvmMat = camera.PV_Matrix * (testSlimeTwo.modelMat);
 	glUniformMatrix4fv(modelTexShader.pvmUniformLoc, 1, GL_TRUE, pvmMat.matrix);
-
 	testSlimeTwo.drawBound();
+
+	pvmMat = camera.PV_Matrix * testError.modelMat;
+	glUniformMatrix4fv(modelTexShader.pvmUniformLoc, 1, GL_TRUE, pvmMat.matrix);
+	testError.drawBound();
+
+	pvmMat = camera.PV_Matrix * testSphere.modelMat;
+	glUniformMatrix4fv(modelTexShader.pvmUniformLoc, 1, GL_TRUE, pvmMat.matrix);
+	testSphere.drawBound();
+
+
 
 	glDisableVertexAttribArray(0);
 	glDisableVertexAttribArray(1);
@@ -151,12 +204,21 @@ static void key_callback(GLFWwindow* windowP, int key, int scancode, int action,
 
 		switch (key){
 		case 32://space
+			/*
 			if (mods == 0x0001){//shift
 				camera.cameraPosition[1] -= 0.5f;
 			}
 			else{
 				camera.cameraPosition[1] += 0.5f;
+			}*/
+			if (!camIsJumping){
+			//	camVelocity = 5.0f;
+				camIsJumping = true;
+				jumpTime = glfwGetTime();
 			}
+
+
+
 	//Movekeys:
 			{ 
 			break;
@@ -175,18 +237,26 @@ static void key_callback(GLFWwindow* windowP, int key, int scancode, int action,
 			}
 	//Misc keys:
 		case 69://e
-			tbool = !tbool;
+			break;
+		case 81://q
+			//cout <<  ground.getLocalHeight(camera.cameraPosition.coords[0], camera.cameraPosition.coords[2]) << endl;
 			break;
 		case 256://esc
 			if (paused) { glfwSetInputMode(window.primaryWindow, GLFW_CURSOR, GLFW_CURSOR_HIDDEN); }
 			else { glfwSetInputMode(window.primaryWindow, GLFW_CURSOR, GLFW_CURSOR_NORMAL); }
 			paused = !paused;
 			break;
-		case 81://q
-			//tempbool = !tempbool;
-			//if (tempbool) glDisable(GL_MULTISAMPLE);
-			//else glEnable(GL_MULTISAMPLE);
-			cout <<  ground.getLocalHeight(camera.cameraPosition.coords[0], camera.cameraPosition.coords[2]) << endl;
+		//# keys
+		case 49:// 1
+			tbool = !tbool;
+			break;
+		case 50:// 2
+			tbool2 = !tbool2;
+			break;
+		case 51:// 3
+			tbool3 = !tbool3;
+			if (tbool3) glEnable(GL_MULTISAMPLE);
+			else glDisable(GL_MULTISAMPLE);
 			break;
 		default:
 			cout << key << endl;
@@ -303,7 +373,7 @@ void initialize(){
 	modelTexShader.pvmUniformLoc = glGetUniformLocation(modelTexShader.theProgram, "pvm");
 
 ////Camera///////////////////
-	camera = Camera(1.2f, -0.6f, 5.5f, 0.0f, 7.0f);
+	camera = Camera(1.2f, -0.6f, 2.5f, 5.0f, 7.0f, 12.0f);
 	camera.makeProjectionMatrix(FoV, (float)window.width / window.height, 0.1f, 100.0f);
 	camera.update();
 	degreesPerPixelVert = (FoV/window.height);
@@ -312,7 +382,8 @@ void initialize(){
 	degreesPerPixelHorz = halfHorzFoV / (window.width / 2.0f);
 
 ////Terrain//////////////////
-	ground.loadTerrain("Textures/Terrain/terrainDiag.tga", 32.0f, 32.0f, 3.5f, 16.0f);
+//	ground.loadTerrain("Textures/Terrain/testTerrainFlat.tga", 32.0f, 32.0f, 3.5f, 16.0f);
+	ground.loadTerrain("Textures/Terrain/terrainLarge.tga", 80.0f, 80.0f, 5.5f, 16.0f);
 	ground.texture = textureLib::fetchTexture(resource::NULL_ENUM);
 	glBindTexture(GL_TEXTURE_2D, ground.texture);
 	glBindTexture(GL_TEXTURE_2D, 0);
@@ -320,6 +391,8 @@ void initialize(){
 ///TEMP/////////
 	testSlime = WorldObject(resource::SLIME);
 	testSlimeTwo = WorldObject(resource::SLIME);
+	testError = WorldObject(resource::ROCK, resource::SPHERE); testError.modelMat[3] += 5.0f; testError.modelMat[11] -= 5.0f;
+	testSphere = WorldObject(resource::SPHERE, resource::ROCK); testSphere.modelMat[3] -= 5.0f; testSphere.modelMat[11] += 5.0f;
 	lines.genVertBuffer();
 }
 
@@ -328,7 +401,9 @@ void exit(){
 	glDeleteShader(pvSolidColorShader.theProgram);
 	glDeleteShader(modelTexShader.theProgram);
 	glDeleteSamplers(1, &pvOnlyShader.sampler);
+
 	ground.surfaceMesh.cleanup();
+
 	textureLib::cleanAll();
 	modelLib::cleanAll();
 }
@@ -381,7 +456,7 @@ int main(int argc, char **argv){
 	glfwSetCursorPos(window.primaryWindow, window.width * 0.50, window.height * 0.50);
 
 	glEnable(GL_DEPTH_TEST);
-	//glEnable(GL_CULL_FACE);
+	glEnable(GL_CULL_FACE);
 	glEnable(GL_MULTISAMPLE);
 
 	glfwSwapInterval(1);

@@ -31,9 +31,13 @@ public: //really need to move these to private, /use get methods// actually try 
 	~Camera();
 
 	void translate(vector3 transVec);
+	void translateVert(float yMovement);
 	void translateTo(vector3 moveTo);
+	void translateVertTo(float moveToY);
+
 	void rotateCameraHorz(float angle);
 	void rotateCameraVert(float angle);
+
 	void moveCamera(float speedMod);//XZ plane "grounded" movement
 	void moveCameraUnbound(float speedMod);//Full XYZ movement
 

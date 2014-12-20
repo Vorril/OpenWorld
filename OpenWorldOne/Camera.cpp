@@ -109,8 +109,19 @@ void Camera::translate(vector3 transVec){
 	viewNeedsRemade = true;
 }
 
+//Proper encapsulation for gravitation movement
+void Camera::translateVert(float yMovement){
+	cameraPosition[1] += yMovement;
+	viewNeedsRemade = true;
+}
+
 void Camera::translateTo(vector3 moveTo){
 	cameraPosition = moveTo;
+	viewNeedsRemade = true;
+}
+
+void Camera::translateVertTo(float moveToY){
+	cameraPosition[1] = moveToY;
 	viewNeedsRemade = true;
 }
 

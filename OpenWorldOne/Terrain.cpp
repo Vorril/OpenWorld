@@ -66,12 +66,36 @@ void Terrain::loadTerrain(const char* file, float unitsWide, float unitsLength, 
 float Terrain::getLocalHeight(float worldX, float worldZ){
 	float terrX = worldX - this->xOffset;
 	float terrZ = worldZ - this->zOffset;
-	int xCoord = floorf((terrX / xUnitsWide)*xGridUnits); //floor >> 0 to gridUnits-1
-	int zCoord = floorf((terrZ / zUnitsWide)*zGridUnits);
-	//terrain(x, y) terrainLinear[(x)*width + z]
+	float gridUnitWidth =  this->xUnitsWide / (this->xGridUnits - 1);//this is only for square meshes so far then
+	float gridX = terrX / gridUnitWidth; 
+	float gridZ = terrZ / gridUnitWidth;
+	int gridBaseX = (int)floorf(gridX);
+	int gridBaseZ = (int)floorf(gridZ);
+	float xRemainder = gridX - floorf(gridX); // remainder of 12.34 = 0.34
+	float zRemainder = gridZ - floorf(gridZ);
 
-	return terrainLinear[(xCoord*zGridUnits) + zCoord]*(depth / 255.0f);
+#define height zGridUnits
+	vector3 normal;//calculate normal in terrain coordinates
+	//this next line needs to change for non square meshes, also would have to double check creation and macroing
+	if (zRemainder > xRemainder){//top left triangle in a mesh sq															//top left
+		normal = (vector3(gridUnitWidth, terrain(gridBaseX + 1, gridBaseZ + 1) * (this->depth / 256), gridUnitWidth) + -vector3(0.0f, terrain(gridBaseX, gridBaseZ + 1) * (this->depth / 256), gridUnitWidth))
+			%    (vector3(0.0f,          terrain(gridBaseX, gridBaseZ) * (this->depth / 256),         0.0f) 		 + -vector3(0.0f, terrain(gridBaseX, gridBaseZ + 1) * (this->depth / 256), gridUnitWidth));
+		}
+	else{ //bot right tri		V^V^ top right and bot left ^V^V															//bot right
+		normal = (vector3(gridUnitWidth, terrain(gridBaseX + 1, gridBaseZ + 1) * (this->depth / 256), gridUnitWidth) + -vector3(gridUnitWidth, terrain(gridBaseX + 1, gridBaseZ) * (this->depth / 256), 0.0f))
+			%    (vector3(0.0f,          terrain(gridBaseX,     gridBaseZ) * (this->depth / 256),     0.0f)			 + -vector3(gridUnitWidth, terrain(gridBaseX + 1, gridBaseZ) * (this->depth / 256), 0.0f));
+	}
+	normal.normalize();
 
+	//if P0 is a point on the plane; n is the plane normal; L0 is a point on the line; L is ray normal
+	// t = (P0 - L0) * n / (L * n);							P0 = point on the plane
+
+	return ((vector3(gridBaseX*gridUnitWidth, terrain(gridBaseX, gridBaseZ) * (this->depth / 256), gridBaseZ*gridUnitWidth) + vector3(-terrX, 0.0f, -terrZ)) * normal)
+		/// (vector3(0.0f, 1.0f, 0.0f) * normal); //simplified
+		/ normal[1];
+
+
+#undef height
 }
 
 

@@ -11,8 +11,10 @@ static GLuint checkTexture(textureLib::textureUnit *texture);
 
 //////////////////////TextureLib//////////////////////
 namespace textureLib{
+std::tuple <GLuint, bool, const char*> Default = textureLib::textureUnit(0, false, "Textures/default.bmp");
 std::tuple <GLuint, bool, const char*> Slime = textureLib::textureUnit(0, false, "Textures/slime.bmp");
-std::tuple <GLuint, bool, const char*> Test = textureLib::textureUnit(0, false, "Textures/testTexture.bmp");
+std::tuple <GLuint, bool, const char*> Test = textureLib::textureUnit(0, false, "Textures/testTexture.bmp");//should prob use only default
+std::tuple <GLuint, bool, const char*> Rock = textureLib::textureUnit(0, false, "Textures/rockRough.bmp");
 
 	GLuint textureLib::fetchTexture(resource enumCode){
 		switch (enumCode){
@@ -20,13 +22,18 @@ std::tuple <GLuint, bool, const char*> Test = textureLib::textureUnit(0, false, 
 			return checkTexture(&Test);
 		case SLIME:
 			return checkTexture(&Slime);
+		case ROCK:
+			return checkTexture(&Rock);
 		default:
-			break;
+			return checkTexture(&Default);
 		}//switch
 	}//fetch
 
 	void textureLib::cleanAll(){
 		if (isLoaded(Slime)) glDeleteTextures(1, &getTexture(Slime));
+		if (isLoaded(Rock)) glDeleteTextures(1, &getTexture(Rock));
+		if (isLoaded(Default)) glDeleteTextures(1, &getTexture(Default));
+		if (isLoaded(Test)) glDeleteTextures(1, &getTexture(Test));
 	}
 
 }//ns
@@ -46,12 +53,13 @@ std::tuple <GLuint, bool, const char*> Test = textureLib::textureUnit(0, false, 
 
 
 //////////////////////ModelLib////////////////////////
-namespace modelLib{
+namespace modelLib{// const correctness here ?
+std::tuple<vec4VBO*, bool, const char*> Default = modelLib::modelUnit(nullptr, false, "Models/default.mdl");
 std::tuple<vec4VBO*, bool, const char*> Slime = modelLib::modelUnit(nullptr, false, "Models/slime.mdl");
-
+std::tuple<vec4VBO*, bool, const char*> Sphere = modelLib::modelUnit(nullptr, false, "Models/sphere.mdl");
 
 	vec4VBO* fetchModel(resource enumCode){
-		//dont call
+		//dont call the object class should interact with this
 
 		switch (enumCode){
 		case NULL_ENUM:
@@ -59,15 +67,21 @@ std::tuple<vec4VBO*, bool, const char*> Slime = modelLib::modelUnit(nullptr, fal
 		case SLIME:
 			checkModel(&Slime);
 			return getVBO(Slime);
+		case SPHERE:
+			checkModel(&Sphere);
+			return getVBO(Sphere);
 		default:
-			break;
+			checkModel(&Default);
+			return getVBO(Default);
 		}
 
 		return nullptr;
 	}//fetch
 
-	void modelLib::cleanAll(){
+	void modelLib::cleanAll(){//can probly improve 
 		if (isLoaded(Slime)) getVBO(Slime)->cleanup();
+		if (isLoaded(Sphere)) getVBO(Sphere)->cleanup();
+		if (isLoaded(Default)) getVBO(Default)->cleanup();
 	}
 
 }//ns
