@@ -11,10 +11,11 @@ static GLuint checkTexture(textureLib::textureUnit *texture);
 
 //////////////////////TextureLib//////////////////////
 namespace textureLib{
-std::tuple <GLuint, bool, const char*> Default = textureLib::textureUnit(0, false, "Textures/default.bmp");
+std::tuple <GLuint, bool, const char*> Default = textureLib::textureUnit(0, false, "Textures/colorGrid.bmp");
 std::tuple <GLuint, bool, const char*> Slime = textureLib::textureUnit(0, false, "Textures/slime.bmp");
 std::tuple <GLuint, bool, const char*> Test = textureLib::textureUnit(0, false, "Textures/testTexture.bmp");//should prob use only default
 std::tuple <GLuint, bool, const char*> Rock = textureLib::textureUnit(0, false, "Textures/rockRough.bmp");
+std::tuple <GLuint, bool, const char*> DirtRough = textureLib::textureUnit(0, false, "Textures/groundWoodChip.bmp");
 
 	GLuint textureLib::fetchTexture(resource enumCode){
 		switch (enumCode){
@@ -24,6 +25,8 @@ std::tuple <GLuint, bool, const char*> Rock = textureLib::textureUnit(0, false, 
 			return checkTexture(&Slime);
 		case ROCK:
 			return checkTexture(&Rock);
+		case DIRT_ROUGH:
+			return checkTexture(&DirtRough);
 		default:
 			return checkTexture(&Default);
 		}//switch
@@ -57,6 +60,7 @@ namespace modelLib{// const correctness here ?
 std::tuple<vec4VBO*, bool, const char*> Default = modelLib::modelUnit(nullptr, false, "Models/default.mdl");
 std::tuple<vec4VBO*, bool, const char*> Slime = modelLib::modelUnit(nullptr, false, "Models/slime.mdl");
 std::tuple<vec4VBO*, bool, const char*> Sphere = modelLib::modelUnit(nullptr, false, "Models/sphere.mdl");
+std::tuple<vec4VBO*, bool, const char*> CubeFancy = modelLib::modelUnit(nullptr, false, "Models/cubeEdges.mdl");
 
 	vec4VBO* fetchModel(resource enumCode){
 		//dont call the object class should interact with this
@@ -70,6 +74,9 @@ std::tuple<vec4VBO*, bool, const char*> Sphere = modelLib::modelUnit(nullptr, fa
 		case SPHERE:
 			checkModel(&Sphere);
 			return getVBO(Sphere);
+		case CUBE_FANCY:
+			checkModel(&CubeFancy);
+			return getVBO(CubeFancy);
 		default:
 			checkModel(&Default);
 			return getVBO(Default);

@@ -1,5 +1,6 @@
 #pragma once
 #include <vector4.h>
+#include <matrix3.h>
 #include <iostream> //DEBUG NOTE: REMOVE LATER
 //#include <GL/glew.h>
 
@@ -26,7 +27,7 @@ public:
 	static vector4 rotateByArb_XYZ(vector4 pointToRot, vector4 axisNormal, float theta);
 	static vector4 rotateByArb_XZ(vector4 pointToRot, vector4 axisNormal, float theta);
 
-	matrix4 transpose();
+	matrix4  transpose()const;
 
 	matrix4 operator*(const matrix4& dot);
 	vector4 operator*(const vector4& dot);
@@ -34,7 +35,8 @@ public:
 
 	float operator[](int i) const{ return matrix[i]; }
 	float & operator[](int i){ return matrix[i]; }
-	
+	operator matrix3()const;
+
 	void printMat(char* name){
 		std::cout << name << std::endl;
 		printf("%8.3lf", matrix[0]); printf("%8.3lf", matrix[1]); printf("%8.3lf", matrix[2]); printf("%8.3lf", matrix[3]); std::cout << std::endl;

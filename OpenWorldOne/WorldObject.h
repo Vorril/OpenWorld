@@ -22,8 +22,17 @@ public:
 	matrix4 modelMat;
 	vec4VBO* model;
 	GLuint TEX_IMG;
+	vector3 velocity;
+
+	vector3 position();
+
 	//draw with given shader
 	void draw(GLuint* program);
+	//bind gl program, sampler, pointers 
+	//should probably make this variable or abstract and inherited
+	void bindProgram(Shader const &shaderToUse);
+	//bind texture to follow with drawBound()
+	void bindTexture();
 	//draw maintaining GL state bindings
 	void drawBound();
 	

@@ -116,11 +116,12 @@ public:
 
 		glGenBuffers(1, &pv_UBO);
 		glBindBuffer(GL_UNIFORM_BUFFER, pv_UBO);
-		glBufferData(GL_UNIFORM_BUFFER, sizeof(float) * 48, NULL, GL_STREAM_DRAW);
+		glBufferData(GL_UNIFORM_BUFFER, sizeof(float) * 52, NULL, GL_STREAM_DRAW);
+			//1-16:Persp. mat//16-32 view mat.// 32-48pers*view mat//48-51 sun direction 52 sun intensity
 		glBindBuffer(GL_UNIFORM_BUFFER, 0);
 
 		glUniformBlockBinding(existingShader->theProgram, pv_UBO_index, 1);//the association, 1 is a binding point
-		glBindBufferRange(GL_UNIFORM_BUFFER, 1, pv_UBO, 0, sizeof(float) * 48);//association pt 2, they look like htey combine through index 1 now
+		glBindBufferRange(GL_UNIFORM_BUFFER, 1, pv_UBO, 0, sizeof(float) * 52);//association pt 2, they look like they combine through index 1 now
 	}
 	
 	static void updateUPO_p(matrix4 * pMat){
@@ -142,6 +143,11 @@ public:
 		glBindBuffer(GL_UNIFORM_BUFFER, 0);
 	}
 
+	static void updateUPO_light(vector4 light){
+		glBindBuffer(GL_UNIFORM_BUFFER, pv_UBO);
+		glBufferSubData(GL_UNIFORM_BUFFER, sizeof(float) * 48, sizeof(float) * 4, &light.coords[0]); //&pvMat->matrix[0]);
+		glBindBuffer(GL_UNIFORM_BUFFER, 0);
+	}
 };//class
 
 

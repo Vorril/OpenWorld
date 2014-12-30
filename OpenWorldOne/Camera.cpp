@@ -174,6 +174,11 @@ void Camera::update(){
 		PV_Matrix = projectionMatrix * viewMatrix;
 		Shader::updateUPO_pv(&PV_Matrix);
 		pvNeedsUpdate = false;
+
+		//may move modify: update the light vector
+		//doing this keeps it in clip space so i can use the pvm matrix for normal modification
+		//I read that is only allowed so long as pvm does not scale
+
 	}
 }
 

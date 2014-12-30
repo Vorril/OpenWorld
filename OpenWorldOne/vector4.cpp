@@ -20,6 +20,14 @@ vector4::vector4(){
 	coords[3] = 1.0f;
 }
 
+vector4::vector4(vector3 dir, float wVal){
+	coords[0] = dir[0];
+	coords[1] = dir[1];
+	coords[2] = dir[2];
+	coords[3] = wVal;
+
+}
+
 vector4::~vector4()
 {
 }

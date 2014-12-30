@@ -39,11 +39,12 @@ public:
 	float operator[](int i) const{ return coords[i]; }
 	float & operator[](int i){ return coords[i]; }
 
-	operator vector3(){
+	operator const vector3(){
 		return vector3(coords[0], coords[1], coords[2]);
 	}
 
 	vector4(float xCoord, float yCoord, float zCoord, float wVal = 1.0f);
+	vector4(vector3 dir, float wVal = 1.0f);
 	vector4();
 
 	~vector4();

@@ -8,6 +8,7 @@ draw functions are mostly being phased out of this class
 
 genTex includes genUV
 
+doesnt need to be called vec4VBO really just VBO
 */
 #include <matrix4.h> //includes vec4.h and math.h
 #include <vector3.h>

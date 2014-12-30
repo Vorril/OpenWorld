@@ -9,6 +9,7 @@ layout(std140) uniform GlobalPV
 mat4 p;
 mat4 v;
 mat4 pv;
+vec4 l;
 };
 
 void main()

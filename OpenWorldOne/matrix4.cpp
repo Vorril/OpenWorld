@@ -181,7 +181,7 @@ vector4 matrix4::rotMult(vector4 dot){							// x        0
 	return newVector;
 }
 
-matrix4 matrix4::transpose(){
+matrix4 matrix4::transpose()const{
 	// RM | 0  1  2  3 |	CM	| 0  4  8   12 |
 	//	  | 4  5  6  7 |		| 1  5  9   13 |
 	//	  | 8  9 10 11 |		| 2  6  10  14 |
@@ -208,4 +208,25 @@ matrix4 matrix4::transpose(){
 
 	return transposed;
 
+}
+
+// 0  1  2  3      // 0  1  2  -
+// 4  5  6  7      // 3  4  5  -
+// 8  9  10 11     // 6  7  8  -
+// 12 13 14 15        -  -  -  -
+matrix4::operator matrix3()const{
+	matrix3 topLeft;
+	topLeft[0] = matrix[0];
+	topLeft[1] = matrix[1];
+	topLeft[2] = matrix[2];
+
+	topLeft[3] = matrix[4];
+	topLeft[4] = matrix[5];
+	topLeft[5] = matrix[6];
+
+	topLeft[6] = matrix[8];
+	topLeft[7] = matrix[9];
+	topLeft[8] = matrix[10];
+
+	return topLeft;
 }

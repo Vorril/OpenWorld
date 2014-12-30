@@ -14,9 +14,11 @@ OR created if it did not exist
 
 Semantics for preinitializing things are worth consideration (poss in loadscreens or at least multithreaded)
 Should add unloading process in the future
+
+POSS TODO: Add a flywieght member on demand at run time
 */
 
-static enum resource{NULL_ENUM, DEFAULT, SLIME, SPHERE, ROCK};
+static enum resource{NULL_ENUM, DEFAULT, SLIME, SPHERE, ROCK, CUBE_FANCY, DIRT_ROUGH};
 
 namespace textureLib{
 	typedef std::tuple<GLuint, bool, const char*> textureUnit;
