@@ -29,6 +29,7 @@ public:
 	GLuint theProgram; 
 	GLuint sampler;// for texture programs
 	GLuint pvmUniformLoc;//could make this more dynamic since not everything uses it
+	GLuint mUniformLoc;//modelmat only used for (some) lighting shaders
 
 	static GLuint pv_UBO_index;//UBO unique index thing
 	static GLuint pv_UBO;//location

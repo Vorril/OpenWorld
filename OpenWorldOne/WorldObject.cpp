@@ -12,13 +12,15 @@ WorldObject::~WorldObject()
 
 WorldObject::WorldObject(resource enumCode){
 	model = modelLib::fetchModel(enumCode);
-	modelMat[7] = 7.5f;//testing
+	modelMat[7] = 1.5f;//testing
 	TEX_IMG = textureLib::fetchTexture(enumCode);
+
 }
 WorldObject::WorldObject(resource modelCode, resource texCode){
 	velocity = vector3(0.0f, 0.0f, 0.0f);
 	model = modelLib::fetchModel(modelCode);
 	TEX_IMG = textureLib::fetchTexture(texCode);
+
 }
 
 vector3 WorldObject::position(){
@@ -59,3 +61,4 @@ void WorldObject::drawBound(){
 	//glBindTexture(GL_TEXTURE_2D, IMG_ID);
 	glDrawArrays(GL_TRIANGLES, 0, model->verticies.size());
 }
+

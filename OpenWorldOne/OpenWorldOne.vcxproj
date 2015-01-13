@@ -80,6 +80,7 @@
     <ClCompile Include="matrix3.cpp" />
     <ClCompile Include="matrix4.cpp" />
     <ClCompile Include="Shader.cpp" />
+    <ClCompile Include="Skybox.cpp" />
     <ClCompile Include="Terrain.cpp" />
     <ClCompile Include="vec4VBO.cpp" />
     <ClCompile Include="vector2.cpp" />
@@ -94,6 +95,7 @@
     <ClInclude Include="matrix3.h" />
     <ClInclude Include="matrix4.h" />
     <ClInclude Include="Shader.h" />
+    <ClInclude Include="Skybox.h" />
     <ClInclude Include="Terrain.h" />
     <ClInclude Include="vec4VBO.h" />
     <ClInclude Include="vector2.h" />

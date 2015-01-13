@@ -16,11 +16,12 @@ vec4 l;
 };
 
 uniform mat4 pvm;
+uniform mat4 m;
 
 void main()
 {
     gl_Position = pvm * vert;
     UV = vertUV;
-    incidence = dot(l.rgb, normal);
+    incidence = dot(l.rgb, mat3(m)*normal);
     lightPow = l.a;
 }

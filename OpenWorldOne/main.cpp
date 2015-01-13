@@ -8,6 +8,7 @@
 #include <World.h> //hold the state of the world, display lists etc, reduce as much as possible from living in main
 #include <Camera.h> //includes mats and shader
 #include <Terrain.h> //should probably moce to world
+#include <Skybox.h>
 
 /*
 TODO
@@ -48,10 +49,11 @@ WorldObject testSlime;
 WorldObject testSlimeTwo;
 WorldObject testError;
 WorldObject testCube;
+WorldObject testBoulder;
 std::vector<WorldObject> testSpheres;
 
 bool tbool3 = false;
-bool tbool2 = false;
+bool tbool2 = true;
 bool tbool = false;
 
 int countTemp = 0;
@@ -83,11 +85,12 @@ Shader modelTexLitShader;
 
 //Misc Important
 Terrain ground; 
+Skybox sky;
 
 bool paused = false;
 double prevTime = 0.0;
 double deltaT = 0.0;
-
+float dotCullLimit = 0.0f;
 
 struct windowData{ //Data for a window, width, height,  and mouse coords etc
 	int width; int height;
@@ -98,51 +101,42 @@ struct windowData{ //Data for a window, width, height,  and mouse coords etc
 GLFWmonitor* myMonitor = nullptr;
 
 
-//upload the light vector in clipspace
-static void updateLight(){
-	vector3 parallelLightDir = vector3(1.0f, 1.0f, 0.0f);
-	parallelLightDir.normalize();
 
-	float power = parallelLightSource[3];
-	parallelLightDir = (matrix3)(camera.PV_Matrix.transpose()) * parallelLightDir;
-	//parallelLightDir.normalize();
-
-	parallelLightSource = vector4(parallelLightDir, power);
-	Shader::updateUPO_light(parallelLightSource);
-}
 
 static bool inFrame(vector3  objectpos){// ushort precision 0, 1, 2 considering multiple angles cull dist etc
 	vector3 objToCam = (objectpos - camera.cameraPosition);
 	objToCam.normalize();
-	float dotLimit = -cosf(HorzFoV*radiansPerDegree / 2); //this is always same save it in winresize
 	float dot = objToCam * camera.lookDirection;
-	return dot < dotLimit;
+	return dot < dotCullLimit;
 }
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-void display(){
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-	deltaT = glfwGetTime() - prevTime;
-	//getTime ~ deltaT + prevTime
-	//newPrevTime = getTime
-	prevTime = deltaT + prevTime;//dont have to call getTime a second time, should be very close to true maybe better
 
+//apply gravity and bounce if neccessary
+static void moveGravity(WorldObject &WorldObjVar){
+	float yIntercept = 0.0f;
+	yIntercept = ground.getLocalHeight(WorldObjVar.modelMat[3], WorldObjVar.modelMat[11]);
+	WorldObjVar.velocity[1] -= (float)(gravity *deltaT * 8.0);
+	WorldObjVar.modelMat[7] += WorldObjVar.velocity[1] * deltaT;
+	if (WorldObjVar.modelMat[7] < yIntercept){
+		WorldObjVar.velocity[1] *= -1.0f;// -WorldObjVar.velocity[1]; //;
+		WorldObjVar.modelMat[7] = yIntercept;
+	}
+}
 
-	glfwPollEvents();
-	if (!paused)checkMouse();
-
+//move the character (camera) also sets cam to update
+static void moveMainChar(){
 	if (!tbool2)//need to make all this velocity relative
 		// need to make sure you cant stand on anything too steep
-	camera.moveCameraUnbound(7.10*deltaT);//fly
+		camera.moveCameraUnbound(7.10*deltaT);//fly
 	if (tbool2){
 		camera.moveCamera(7.10 * deltaT);//bound XZ
-		float yIntercept  = ground.getLocalHeight(camera.cameraPosition.coords[0], camera.cameraPosition.coords[2]) + camEyeHeight;//poss return the normal collided with
-		
+		float yIntercept = ground.getLocalHeight(camera.cameraPosition.coords[0], camera.cameraPosition.coords[2]) + camEyeHeight;//poss return the normal collided with
+
 		if (camIsJumping){
 			float yMove;
 			//camVelocity -= deltaT * gravity * 1.0f;
 			double timeSinceJump = prevTime - jumpTime;
 			if ((timeSinceJump) < 0.18){ //0.18s // prevtime is effectively currenttime
-				camVelocity = (timeSinceJump) * 33.0;
+				camVelocity = (timeSinceJump)* 33.0;
 				if (camVelocity < 0.0) camVelocity = -camVelocity;
 			}//pulsing
 			else{
@@ -157,25 +151,37 @@ void display(){
 				camIsJumping = false;
 			}
 			//else{//still above the ground
-				
+
 			//}
 		}//was jumping
 		else camera.translateVertTo(yIntercept);
 	}//bound movement
 	camera.update();
+}
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+void display(){
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	deltaT = glfwGetTime() - prevTime;
+	//getTime ~ deltaT + prevTime
+	//newPrevTime = getTime
+	prevTime = deltaT + prevTime;//dont have to call getTime a second time, should be very close to true maybe better
+
+
+	glfwPollEvents();
+	if (!paused)checkMouse();
+
+	//testing
+	sky.drawSB(camera.cameraPosition);
+
+	moveMainChar();
 
 	//if (tbool3){//damped? // could add a booling ifFalling
-		float yIntercept = 0.0f;
+		
 	for(auto &WorldObjVar : testSpheres){
-		yIntercept = ground.getLocalHeight(WorldObjVar.modelMat[3], WorldObjVar.modelMat[11]);
-		WorldObjVar.velocity[1] -= (float)(gravity *deltaT * 8.0);
-		WorldObjVar.modelMat[7] += WorldObjVar.velocity[1] * deltaT;
-		if (WorldObjVar.modelMat[7] < yIntercept){
-			WorldObjVar.velocity[1] *= -1.0f;// -WorldObjVar.velocity[1]; //;
-			WorldObjVar.modelMat[7] = yIntercept;
-		}
+		moveGravity(WorldObjVar);
 	}
-//}
+
 
 	//DRAW:
 	//TODO: Organize by shader used etc
@@ -205,24 +211,22 @@ void display(){
 	testSlime.modelMat = testSlime.modelMat * matrix4::makeRotateYaxis(1.0f);
 	matrix4 pvmMat = camera.PV_Matrix * (testSlime.modelMat);
 	
-	//initialize pvm shader
-//	glUseProgram(modelTexShader.theProgram);
-	//glBindSampler(0, modelTexShader.sampler);
-	
-	//glEnableVertexAttribArray(0); // position
-	//glEnableVertexAttribArray(1); // uv tex coords
 
-	testSlime.bindProgram(modelTexShader);
+	testSlime.bindProgram(modelTexLitShader);
 
-	glUniformMatrix4fv(modelTexShader.pvmUniformLoc, 1, GL_TRUE, pvmMat.matrix);
+	glUniformMatrix4fv(modelTexLitShader.pvmUniformLoc, 1, GL_TRUE, pvmMat.matrix);
+	glUniformMatrix4fv(modelTexLitShader.mUniformLoc, 1, GL_TRUE, testSlime.modelMat.matrix);//this isnt copying is it? it doesnt need to.
 	testSlime.bindTexture();///
 	testSlime.drawBound();
 
 	testSlimeTwo.modelMat = testSlimeTwo.modelMat * matrix4::makeRotateYaxis(-1.0f);
 	pvmMat = camera.PV_Matrix * (testSlimeTwo.modelMat);
-	glUniformMatrix4fv(modelTexShader.pvmUniformLoc, 1, GL_TRUE, pvmMat.matrix);
+	glUniformMatrix4fv(modelTexLitShader.pvmUniformLoc, 1, GL_TRUE, pvmMat.matrix);
+	glUniformMatrix4fv(modelTexLitShader.mUniformLoc, 1, GL_TRUE, testSlimeTwo.modelMat.matrix);
 	testSlimeTwo.drawBound();
 
+	//new shader
+	testError.bindProgram(modelTexShader);
 	pvmMat = camera.PV_Matrix * testError.modelMat;
 	glUniformMatrix4fv(modelTexShader.pvmUniformLoc, 1, GL_TRUE, pvmMat.matrix);
 	testError.drawBound();
@@ -242,6 +246,11 @@ void display(){
 	pvmMat = camera.PV_Matrix * testCube.modelMat;
 	glUniformMatrix4fv(modelTexShader.pvmUniformLoc, 1, GL_TRUE, pvmMat.matrix);
 	testCube.drawBound();
+
+	testBoulder.bindTexture();
+	pvmMat = camera.PV_Matrix * testBoulder.modelMat;
+	glUniformMatrix4fv(modelTexShader.pvmUniformLoc, 1, GL_TRUE, pvmMat.matrix);
+	testBoulder.drawBound();
 
 	//put these somewhere better:
 	glDisableVertexAttribArray(0);
@@ -405,8 +414,8 @@ void scroll_callback(GLFWwindow* windowP, double xpos, double ypos){
 	//if (parallelLightSource[3] < 0.0f) parallelLightSource[3] = 0.0f;
 	//calc in clip space:
 	parallelLightSource[3] += (float)ypos*0.1f;
-if (parallelLightSource[3] < 0.0f) parallelLightSource[3] = 0.0f;
-	
+		if (parallelLightSource[3] < 0.0f) parallelLightSource[3] = 0.0f;
+		Shader::updateUPO_light(parallelLightSource);
 	
 }
 
@@ -417,11 +426,17 @@ static void window_size_callback(GLFWwindow* windowP, int widthNew, int heightNe
 
 	camera.makeProjectionMatrix(FoV, (float)window.width / window.height, 0.1f, 100.0f);
 	
+	
+
+	/////Necc. updates:
+	//for mouse movement:
 	degreesPerPixelVert = (FoV / window.height);
 	float d = (window.height / 2.0f) / tanf(FoV*radiansPerDegree / 2);
 	float halfHorzFoV = atan((window.width / 2.0f) / d)*degreesPerRadian;
 	HorzFoV = 2 * halfHorzFoV;//saving
-	degreesPerPixelHorz = halfHorzFoV / (window.width / 2.0f);
+	degreesPerPixelHorz = halfHorzFoV / (window.width / 2.0f); 
+	//For view culling:
+	dotCullLimit = -cosf(HorzFoV*radiansPerDegree / 2);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -430,10 +445,14 @@ static void window_size_callback(GLFWwindow* windowP, int widthNew, int heightNe
 
 void initialize(){
 ////////Shaders///////////////
+	//init skybox(first b/c it owns a Shader)
+	Skybox::skyboxInit();
+	sky = Skybox(std::string("CloudySky"));
+
 	//Create Shaders
 	pvOnlyShader.InitializeProgram("Shaders/primary.vert", "Shaders/primary.frag");//uses only PV from UBO and texture
 	modelTexShader.InitializeProgram("Shaders/modelTex.vert", "Shaders/modelTex.frag");//uses mpv and texture
-	modelTexLitShader.InitializeProgram("Shaders/modelTexLit.vert", "Shaders/modelTexLit.frag");//uses mpv and texture
+	modelTexLitShader.InitializeProgram("Shaders/modelTexLit.vert", "Shaders/modelTexLit.frag");//uses mpv and texture and modelmat
 	pvSolidColorShader.InitializeProgram("Shaders/solidColor.vert", "Shaders/solidColor.frag");//uses only pv from UBO and is solid red
 	//Create Sampler(s)
 	pvOnlyShader.sampler = glGetUniformLocation(pvOnlyShader.theProgram, "diffuseSampler");
@@ -451,6 +470,7 @@ void initialize(){
 	glSamplerParameteri(modelTexShader.sampler, GL_TEXTURE_WRAP_S, GL_CLAMP);
 	glSamplerParameteri(modelTexShader.sampler, GL_TEXTURE_WRAP_T, GL_CLAMP);
 	//glProgramUniform1i(modelTexShader.theProgram, modelTexShader.sampler, 0);
+	modelTexLitShader.sampler = modelTexShader.sampler;
 
 	//Uniforms (Global UBO and misc.)
 	//Shader::setGlobalPV_UBO(&pvOnlyShader);
@@ -459,6 +479,8 @@ void initialize(){
 	glUniformBlockBinding(pvSolidColorShader.theProgram, Shader::pv_UBO_index, 1);
 	glUniformBlockBinding(modelTexShader.theProgram, Shader::pv_UBO_index, 1);
 	glUniformBlockBinding(modelTexLitShader.theProgram, Shader::pv_UBO_index, 1);
+	glUniformBlockBinding(Skybox::cubemapShader.theProgram, Shader::pv_UBO_index, 1);
+
 	modelTexShader.pvmUniformLoc = glGetUniformLocation(modelTexShader.theProgram, "pvm");
 
 	vector3 parallelLightDir = vector3(1.1f, 1.0f, 0.4f);
@@ -466,21 +488,24 @@ void initialize(){
 	parallelLightSource = vector4(parallelLightDir, 2.0f);
 	Shader::updateUPO_light(parallelLightSource);
 	modelTexLitShader.pvmUniformLoc = glGetUniformLocation(modelTexLitShader.theProgram, "pvm");
+	modelTexLitShader.mUniformLoc = glGetUniformLocation(modelTexLitShader.theProgram, "m");
 
 ////Camera///////////////////
-	camera = Camera(1.2f, -0.9f, 0.2f, 5.0f, 7.0f, 12.0f);
+	camera = Camera(20.2f, -0.1f, 0.7f, 0.0f, 6.0f, 0.0f);
 	camera.makeProjectionMatrix(FoV, (float)window.width / window.height, 0.1f, 100.0f);
 	camera.update();
 	degreesPerPixelVert = (FoV/window.height);
 	float d = (window.height / 2.0f) / tanf(FoV*radiansPerDegree / 2); 
 	float halfHorzFoV = atan((window.width / 2.0f) / d)*degreesPerRadian; 
+	HorzFoV = 2 * halfHorzFoV;
 	degreesPerPixelHorz = halfHorzFoV / (window.width / 2.0f);
+	dotCullLimit = -cosf(HorzFoV*radiansPerDegree / 2);
 
 ////Terrain//////////////////
 //	ground.loadTerrain("Textures/Terrain/testTerrainFlat.tga", 32.0f, 32.0f, 3.5f, 16.0f);
 //	ground.loadTerrain("Textures/Terrain/terrainDiag.tga", 64.0f, 64.0f, 3.5f, 16.0f);
 	ground.loadTerrain("Textures/Terrain/testSine.tga", 128.0f, 128.0f, 4.5f, 16.0f);
-	ground.texture = textureLib::fetchTexture(resource::DIRT_ROUGH);
+	ground.texture = textureLib::fetchTexture(resource::GRASS);
 
 ///TEMP/////////
 	testSlime = WorldObject(resource::SLIME);
@@ -493,12 +518,17 @@ void initialize(){
 		testSpheres[i].modelMat[7] = ( rand()*15.0f / RAND_MAX) + 7.0f;
 	}
 	
-	testCube = WorldObject(CUBE_FANCY, resource::DEFAULT);// resource::DEFAULT);
+	testCube = WorldObject(CUBE_FANCY, resource::DEFAULT);
 	testCube.modelMat[3] = 5.0f;
 	testCube.modelMat[7] = 5.0f;
 	testCube.modelMat[11] = 5.0f;
 
+	testBoulder = WorldObject(resource::BOULDER, resource::ROCK_ARID);
+	testBoulder.modelMat[3] = testBoulder.modelMat[11] = 10.0f;
+	testBoulder.modelMat[7] = ground.getLocalHeight(10.0f, 10.0f) - 0.25f;
+
 	lines.genVertBuffer();
+
 
 	deltaT = glfwGetTime() - prevTime;
 	//getTime ~ deltaT + prevTime
@@ -569,6 +599,7 @@ int main(int argc, char **argv){
 	glEnable(GL_DEPTH_TEST);
 	glEnable(GL_CULL_FACE);
 	glEnable(GL_MULTISAMPLE);
+	glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
 
 	glfwSwapInterval(1);
 

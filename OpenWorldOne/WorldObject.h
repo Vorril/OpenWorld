@@ -26,6 +26,7 @@ public:
 
 	vector3 position();
 
+
 	//draw with given shader
 	void draw(GLuint* program);
 	//bind gl program, sampler, pointers 
@@ -35,6 +36,9 @@ public:
 	void bindTexture();
 	//draw maintaining GL state bindings
 	void drawBound();
-	
+
 };
 
+class WorldObjectLit :WorldObject{
+
+};

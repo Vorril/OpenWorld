@@ -17,7 +17,7 @@ doesnt need to be called vec4VBO really just VBO
 
 
 #include <Shader.h>//glew
-#include <GL\SOIL.h>//can remove if vbo generation is entirely abstracted I think I might still be used directly 
+#include <GL\SOIL.h>//can remove if vbo generation is entirely abstracted I think it might still be used directly 
 
 #include <iostream>//temporary
 
