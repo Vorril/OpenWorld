@@ -14,6 +14,7 @@ uniform vec3 m;
 
 void main()
 {
-  gl_Position =  pv * vec4((50.0*vert)+m, 1.0);
+  vec4 pos =  pv * vec4(vert+m, 1.0);
+  gl_Position = pos.xyww;
   texCoord = vert;
 }

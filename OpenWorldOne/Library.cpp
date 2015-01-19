@@ -19,6 +19,7 @@ std::tuple <GLuint, bool, const char*> RockArid = textureLib::textureUnit(0, fal
 std::tuple <GLuint, bool, const char*> DirtRough = textureLib::textureUnit(0, false, "Textures/groundWoodChip.bmp");
 std::tuple <GLuint, bool, const char*> Grass = textureLib::textureUnit(0, false, "Textures/grass.bmp");
 
+//Flywegiht pattern fetch/load if necc.
 	GLuint textureLib::fetchTexture(resource enumCode){
 		switch (enumCode){
 		case NULL_ENUM:

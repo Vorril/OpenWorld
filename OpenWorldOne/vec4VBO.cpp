@@ -16,7 +16,7 @@ vec4VBO::~vec4VBO()
 
 void vec4VBO::cleanup(){
 	glDeleteBuffers(1, &VERT_BUFF_ID);
-	glDeleteBuffers(1, &UV_BUFF_ID);//gets loaded at smae time even if unused, that might not be alright
+	glDeleteBuffers(1, &UV_BUFF_ID);
 	glDeleteBuffers(1, &NORM_BUFF_ID);
 	
 	verticies.clear(); verticies.shrink_to_fit();//warning on shrinktofit not guaranteed

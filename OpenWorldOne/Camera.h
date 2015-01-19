@@ -30,6 +30,7 @@ public: //really need to move these to private, /use get methods// actually try 
 
 	~Camera();
 
+	//Poss moves to MC////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	void translate(vector3 transVec);
 	void translateVert(float yMovement);
 	void translateTo(vector3 moveTo);
@@ -40,6 +41,7 @@ public: //really need to move these to private, /use get methods// actually try 
 
 	void moveCamera(float speedMod);//XZ plane "grounded" movement
 	void moveCameraUnbound(float speedMod);//Full XYZ movement
+	///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 	void update();
 
@@ -53,6 +55,5 @@ private:
 	void makeViewMatrix(vector3 look, vector3 translate);
 	void remakeViewMatrix();
 
-	//void makePVMatrix();
 };
 

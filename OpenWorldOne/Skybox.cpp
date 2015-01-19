@@ -1,5 +1,6 @@
 #include "Skybox.h"
 
+std::vector<Skybox*> Skybox::referenceCounts = {};
 GLuint Skybox::cube_IBO = 0;
 GLuint Skybox::cube_VBO = 0;
 Shader Skybox::cubemapShader = Shader();
@@ -59,43 +60,31 @@ Skybox::Skybox(std::string SBdir){
 	//glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 	//glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
 	glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
+
+	Skybox::referenceCounts.push_back(this);
 }
 
 Skybox::~Skybox()
 {
 }
 
+//could use improvement esp regaurding multiple skyboxes
 void Skybox::cleanAll(){
-	//TODO
+	for (Skybox *box : Skybox::referenceCounts)
+	glDeleteTextures(1, &box->cubeMapTex);
 }
 
 void Skybox::skyboxInit(){
 	Skybox::cubemapShader.InitializeProgram("Shaders/skybox.vert", "Shaders/skybox.frag");
 	Skybox::cubemapShader.sampler = glGetUniformLocation(Skybox::cubemapShader.theProgram, "myCubeSampler");
 	Skybox::cubemapShader.mUniformLoc = glGetUniformLocation(Skybox::cubemapShader.theProgram, "m");
-	/*
-	Skybox::cube_vertices[0] =  Skybox::cube_vertices[3] =  Skybox::cube_vertices[4] = Skybox::cube_vertices[7] =
-	Skybox::cube_vertices[12] = Skybox::cube_vertices[14] = Skybox::cube_vertices[15] = Skybox::cube_vertices[16] =
-	Skybox::cube_vertices[17] = Skybox::cube_vertices[19] = Skybox::cube_vertices[20] = Skybox::cube_vertices[23] = -5.0f;
-	Skybox::cube_vertices[1] = Skybox::cube_vertices[2] = Skybox::cube_vertices[5] = Skybox::cube_vertices[6] =
-	Skybox::cube_vertices[8] = Skybox::cube_vertices[9] = Skybox::cube_vertices[10] = Skybox::cube_vertices[11] =
-	Skybox::cube_vertices[13] = Skybox::cube_vertices[18] = Skybox::cube_vertices[21] = Skybox::cube_vertices[22] = 5.0f;
-	*/
+	
 	glGenBuffers(1, &Skybox::cube_VBO);
 	glBindBuffer(GL_ARRAY_BUFFER, Skybox::cube_VBO);
 	glBufferData(GL_ARRAY_BUFFER, sizeof(float)*24, Skybox::cube_vertices, GL_STATIC_DRAW);
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
 
-	/*
-	Skybox::cube_indicies[0] = Skybox::cube_indicies[15] = Skybox::cube_indicies[16] = 0;
-	Skybox::cube_indicies[1] = Skybox::cube_indicies[14] = Skybox::cube_indicies[20] = 1;
-	Skybox::cube_indicies[2] = Skybox::cube_indicies[5]  = Skybox::cube_indicies[21] = 2;
-	Skybox::cube_indicies[3] = Skybox::cube_indicies[4] = Skybox::cube_indicies[17] = 3;
-	Skybox::cube_indicies[11] = Skybox::cube_indicies[12] = Skybox::cube_indicies[19] = 4;
-	Skybox::cube_indicies[10] = Skybox::cube_indicies[13] = Skybox::cube_indicies[23] = 5;
-	Skybox::cube_indicies[6] = Skybox::cube_indicies[9] = Skybox::cube_indicies[22] = 6;
-	Skybox::cube_indicies[7] = Skybox::cube_indicies[8] = Skybox::cube_indicies[18] = 7;
-	*/
+	
 	glGenBuffers(1, &Skybox::cube_IBO);
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, Skybox::cube_IBO);
 	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(GLushort)*24, Skybox::cube_indicies, GL_STATIC_DRAW);
@@ -103,7 +92,8 @@ void Skybox::skyboxInit(){
 }
 
 void Skybox::drawSB(vector3 cameraPos){
-	glDisable(GL_CULL_FACE);
+	//glDisable(GL_CULL_FACE);
+	glCullFace(GL_FRONT);
 
 	glUseProgram(Skybox::cubemapShader.theProgram);
 	glActiveTexture(GL_TEXTURE0);
@@ -120,6 +110,7 @@ void Skybox::drawSB(vector3 cameraPos){
 
 	glDrawElements(GL_QUADS, 24, GL_UNSIGNED_SHORT, 0);
 
-	glEnable(GL_CULL_FACE);
-	glClear(GL_DEPTH_BUFFER_BIT);
+	glCullFace(GL_BACK);
+	//glEnable(GL_CULL_FACE);
+//	glClear(GL_DEPTH_BUFFER_BIT);
 }

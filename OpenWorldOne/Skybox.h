@@ -13,6 +13,7 @@ public:
 	~Skybox();
 	static void cleanAll();
 
+	static std::vector<Skybox*> referenceCounts;
 
 	static GLfloat* cube_vertices;
 	static GLushort* cube_indicies;
@@ -20,6 +21,8 @@ public:
 	static GLuint cube_IBO;
 
 	static Shader cubemapShader;
+
+
 	//create the cube VBO and the cubemap sampler/shader
 	static void skyboxInit();
 

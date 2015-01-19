@@ -3,28 +3,31 @@
 #include <GL/glfw3.h> // includes windows.h
 #include <math.h>
 
+#include <thread>
+
 //My classes:
 #include <Shader.h>
 #include <World.h> //hold the state of the world, display lists etc, reduce as much as possible from living in main
 #include <Camera.h> //includes mats and shader
 #include <Terrain.h> //should probably moce to world
 #include <Skybox.h>
+#include <MainCharacter.h> // includes cam and terrain
 
 /*
 TODO
-+- Implement model matrices//(re)consider what multiplications to do on the GPU
 -- Consider terrain view culling
 -- Make sure calls to draw are grouped very well
 -- Column major matrixes
 -- VAOs
-+- Implement jump as a  non instant pulse
--- Lookup proper initialization of array of objects
 -- Particle system
 -- Get number of lines to draw something down to (1)
 -- Consider locking downview at like 30 degrees
 -- Abstract base classes for levels and or objects
 -- Do something with misc function placement
 -- Make a physics function/loop
+-- Use element array with terrain, every chunk has the same element array
+-- Restrict jump movement
+-- Keep pulling unecc. out of main
 */
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -60,10 +63,7 @@ int countTemp = 0;
 int mycount = 0;
 
 double gravity = 1.3;
-float camVelocity = 0.0f;
-bool camIsJumping = false;
-double jumpTime = 0.0;
-float camEyeHeight = 2.25f;
+
 ////////////////////////////////////////////////
 //// PERMANENT VARS /////
 ////////////////////////////////////////////////
@@ -71,51 +71,59 @@ vector<WorldObject*> objectList;
 vector<WorldObject*> drawList;
 
 //Camera and Screen Properties
-Camera camera;
-float FoV = 56.0f;//degrees (vert)
-float HorzFoV = 0.0f;// a function of FoV(vert) and screen dims
-float degreesPerPixelVert = 1.0f;
-float degreesPerPixelHorz = 1.0f;//fov relation useful for mouse movement
+//Camera camera;
+MainCharacter player;
 
 //Shaders
 Shader pvOnlyShader; // could hold shaders elsewhere
-Shader pvSolidColorShader;
+Shader pvSolidColorShader; //inside inherited classes
 Shader modelTexShader;
 Shader modelTexLitShader;
 
 //Misc Important
-Terrain ground; 
+TerrainMap ground; 
 Skybox sky;
 
 bool paused = false;
-double prevTime = 0.0;
-double deltaT = 0.0;
-float dotCullLimit = 0.0f;
+
+
 
 struct windowData{ //Data for a window, width, height,  and mouse coords etc
 	int width; int height;
 	double mouseX;
 	double mouseY;
 	GLFWwindow* primaryWindow;
+	float FoV = 56.0f;//degrees (vert)//these are windows properties should put them in the struct
+	float HorzFoV = 0.0f;// a function of FoV(vert) and screen dims
+	float degreesPerPixelVert = 1.0f;
+	float degreesPerPixelHorz = 1.0f;//fov relation useful for mouse movement
+	float dotCullLimit = 0.0f;
 }window;
 GLFWmonitor* myMonitor = nullptr;
 
+MainCharacter::coreTimer times; 
+//struct coreTimer{
+//	double prevTime = 0.0;
+//	double deltaT = 0.0;
+//};
 
 
+
+//Misc functions should think of a good place
 
 static bool inFrame(vector3  objectpos){// ushort precision 0, 1, 2 considering multiple angles cull dist etc
-	vector3 objToCam = (objectpos - camera.cameraPosition);
+	vector3 objToCam = (objectpos - player.position());
 	objToCam.normalize();
-	float dot = objToCam * camera.lookDirection;
-	return dot < dotCullLimit;
+	float dot = objToCam * player.lookDirection();
+	return dot < window.dotCullLimit;
 }
 
 //apply gravity and bounce if neccessary
 static void moveGravity(WorldObject &WorldObjVar){
 	float yIntercept = 0.0f;
-	yIntercept = ground.getLocalHeight(WorldObjVar.modelMat[3], WorldObjVar.modelMat[11]);
-	WorldObjVar.velocity[1] -= (float)(gravity *deltaT * 8.0);
-	WorldObjVar.modelMat[7] += WorldObjVar.velocity[1] * deltaT;
+	yIntercept = ground.getLocalHeight(WorldObjVar.modelMat[3], WorldObjVar.modelMat[11]) +0.6f;
+	WorldObjVar.velocity[1] -= (float)(gravity * times.deltaT * 8.0);
+	WorldObjVar.modelMat[7] += WorldObjVar.velocity[1] * times.deltaT;
 	if (WorldObjVar.modelMat[7] < yIntercept){
 		WorldObjVar.velocity[1] *= -1.0f;// -WorldObjVar.velocity[1]; //;
 		WorldObjVar.modelMat[7] = yIntercept;
@@ -123,60 +131,24 @@ static void moveGravity(WorldObject &WorldObjVar){
 }
 
 //move the character (camera) also sets cam to update
-static void moveMainChar(){
-	if (!tbool2)//need to make all this velocity relative
-		// need to make sure you cant stand on anything too steep
-		camera.moveCameraUnbound(7.10*deltaT);//fly
-	if (tbool2){
-		camera.moveCamera(7.10 * deltaT);//bound XZ
-		float yIntercept = ground.getLocalHeight(camera.cameraPosition.coords[0], camera.cameraPosition.coords[2]) + camEyeHeight;//poss return the normal collided with
 
-		if (camIsJumping){
-			float yMove;
-			//camVelocity -= deltaT * gravity * 1.0f;
-			double timeSinceJump = prevTime - jumpTime;
-			if ((timeSinceJump) < 0.18){ //0.18s // prevtime is effectively currenttime
-				camVelocity = (timeSinceJump)* 33.0;
-				if (camVelocity < 0.0) camVelocity = -camVelocity;
-			}//pulsing
-			else{
-				camVelocity -= deltaT * gravity * 8.0f;
-			}//gravity is in control
-
-			yMove = deltaT * camVelocity;
-			camera.translateVert(yMove);
-
-			if (yIntercept > camera.cameraPosition[1] && timeSinceJump > 0.18){ //moved below the ground // consider jumptime otherwise its imposs to jump uphill
-				camera.translateVertTo(yIntercept);
-				camIsJumping = false;
-			}
-			//else{//still above the ground
-
-			//}
-		}//was jumping
-		else camera.translateVertTo(yIntercept);
-	}//bound movement
-	camera.update();
-}
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void display(){
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-	deltaT = glfwGetTime() - prevTime;
+	times.deltaT = glfwGetTime() - times.prevTime;
 	//getTime ~ deltaT + prevTime
 	//newPrevTime = getTime
-	prevTime = deltaT + prevTime;//dont have to call getTime a second time, should be very close to true maybe better
+	times.prevTime = times.deltaT + times.prevTime;//dont have to call getTime a second time, should be very close to true maybe better
 
 
 	glfwPollEvents();
 	if (!paused)checkMouse();
 
-	//testing
-	sky.drawSB(camera.cameraPosition);
+	
+	//consider saving the groundmap in player, it will never change
+	player.move(&times, &ground);
 
-	moveMainChar();
-
-	//if (tbool3){//damped? // could add a booling ifFalling
 		
 	for(auto &WorldObjVar : testSpheres){
 		moveGravity(WorldObjVar);
@@ -184,13 +156,9 @@ void display(){
 
 
 	//DRAW:
-	//TODO: Organize by shader used etc
 	if (tbool)
-	glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);///!!!//TEMP//!!!///
-	glBindSampler(0, pvOnlyShader.sampler);
-	ground.draw(&pvOnlyShader.theProgram);
-	if (tbool)
-	glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);///!!!//TEMP//!!!///
+	glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);///!!!//TEMP//!!!/// undo is way at the bottom
+	ground.draw(&player.eyeCam);
 	
 	//draw temp
 	glLineWidth(2.3f);
@@ -209,8 +177,8 @@ void display(){
 	testSlime.modelMat[3] = 5 * cos(countTemp*radiansPerDegree);
 	testSlime.modelMat[11] = 5 * sin(countTemp*radiansPerDegree);
 	testSlime.modelMat = testSlime.modelMat * matrix4::makeRotateYaxis(1.0f);
-	matrix4 pvmMat = camera.PV_Matrix * (testSlime.modelMat);
-	
+	matrix4 pvmMat = player.eyeCam.PV_Matrix * (testSlime.modelMat);
+	//this needs so much cleaning^^
 
 	testSlime.bindProgram(modelTexLitShader);
 
@@ -220,14 +188,14 @@ void display(){
 	testSlime.drawBound();
 
 	testSlimeTwo.modelMat = testSlimeTwo.modelMat * matrix4::makeRotateYaxis(-1.0f);
-	pvmMat = camera.PV_Matrix * (testSlimeTwo.modelMat);
+	pvmMat = player.eyeCam.PV_Matrix * (testSlimeTwo.modelMat);
 	glUniformMatrix4fv(modelTexLitShader.pvmUniformLoc, 1, GL_TRUE, pvmMat.matrix);
 	glUniformMatrix4fv(modelTexLitShader.mUniformLoc, 1, GL_TRUE, testSlimeTwo.modelMat.matrix);
 	testSlimeTwo.drawBound();
 
 	//new shader
 	testError.bindProgram(modelTexShader);
-	pvmMat = camera.PV_Matrix * testError.modelMat;
+	pvmMat = player.eyeCam.PV_Matrix * testError.modelMat;
 	glUniformMatrix4fv(modelTexShader.pvmUniformLoc, 1, GL_TRUE, pvmMat.matrix);
 	testError.drawBound();
 
@@ -236,31 +204,40 @@ void display(){
 	for (WorldObject &sphere : testSpheres){
 		if (inFrame(sphere.position())){
 			mycount++;
-		pvmMat = camera.PV_Matrix * sphere.modelMat;
+			pvmMat = player.eyeCam.PV_Matrix * sphere.modelMat;
 		glUniformMatrix4fv(modelTexShader.pvmUniformLoc, 1, GL_TRUE, pvmMat.matrix);
 		sphere.drawBound();
 		}
 	}
 
 	testCube.bindTexture();
-	pvmMat = camera.PV_Matrix * testCube.modelMat;
+	pvmMat = player.eyeCam.PV_Matrix * testCube.modelMat;
 	glUniformMatrix4fv(modelTexShader.pvmUniformLoc, 1, GL_TRUE, pvmMat.matrix);
 	testCube.drawBound();
 
 	testBoulder.bindTexture();
-	pvmMat = camera.PV_Matrix * testBoulder.modelMat;
+	pvmMat = player.eyeCam.PV_Matrix * testBoulder.modelMat;
 	glUniformMatrix4fv(modelTexShader.pvmUniformLoc, 1, GL_TRUE, pvmMat.matrix);
 	testBoulder.drawBound();
 
-	//put these somewhere better:
+	if (tbool)
+		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);///!!!//TEMP//!!!///
+
+
+	//Skybox last (supposed efficiency)
+	glDepthFunc(GL_LEQUAL);  
+	sky.drawSB(player.eyeCam.cameraPosition);
+	glDepthFunc(GL_LESS); 
+
+
+
+//put these somewhere better:
 	glDisableVertexAttribArray(0);
 	glDisableVertexAttribArray(1);
 	glDisableVertexAttribArray(2);
 
 	glUseProgram(0);
-
-
-	glFlush();
+	//glFlush();
 	glfwSwapBuffers(window.primaryWindow);
 }
 
@@ -274,43 +251,40 @@ static void key_callback(GLFWwindow* windowP, int key, int scancode, int action,
 	if (action == 1){//press 
 
 		switch (key){
-		case 32://space
-			/*
-			if (mods == 0x0001){//shift
-				camera.cameraPosition[1] -= 0.5f;
-			}
-			else{
-				camera.cameraPosition[1] += 0.5f;
-			}*/
-			if (!camIsJumping){
-			//	camVelocity = 5.0f;
-				camIsJumping = true;
-				jumpTime = glfwGetTime();
-			}
-
-
-
 	//Movekeys:
-			{ 
+		case 32://space
+			if (!player.jumping){
+				player.jump();
+			}
 			break;
+			{ 	
 		case 65://a
-			camera.keyDownCode += 1;
+			player.eyeCam.keyDownCode += 1;
 			break;
 		case 68://d
-			camera.keyDownCode += 2;
+			player.eyeCam.keyDownCode += 2;
 			break;
 		case 87://w
-			camera.keyDownCode += 4;
+			player.eyeCam.keyDownCode += 4;
 			break;
 		case 83://s
-			camera.keyDownCode += 8;
+			player.eyeCam.keyDownCode += 8;
+			break; 
+		case 340://s
+			player.speed += 5.0f;
 			break;
 			}
 	//Misc keys:
-		case 69://e
+		case 69:{//e
+			double timeStart = glfwGetTime();
+
+			std::thread t1(&TerrainMap::loadChunk, &ground, "Textures/Terrain/testSine.tga", 1, 1, resource::GRASS);
+			t1.detach();
+
+			cout << "Terrain Load: " << (glfwGetTime() - timeStart) * 1000.0 << " ms" << endl;
+		}
 			break;
 		case 81://q
-			//cout <<  ground.getLocalHeight(camera.cameraPosition.coords[0], camera.cameraPosition.coords[2]) << endl;
 			break;
 		case 256://esc
 			if (paused) { glfwSetInputMode(window.primaryWindow, GLFW_CURSOR, GLFW_CURSOR_HIDDEN); }
@@ -322,7 +296,7 @@ static void key_callback(GLFWwindow* windowP, int key, int scancode, int action,
 			tbool = !tbool;
 			break;
 		case 50:// 2
-			tbool2 = !tbool2;
+			player.boundMovement = !player.boundMovement;
 			break;
 		case 51:// 3
 			tbool3 = !tbool3;
@@ -342,16 +316,19 @@ static void key_callback(GLFWwindow* windowP, int key, int scancode, int action,
 		switch (key){
 
 		case 65://a
-			camera.keyDownCode -= 1;
+			player.eyeCam.keyDownCode -= 1;
 			break;
 		case 68://d
-			camera.keyDownCode -= 2;
+			player.eyeCam.keyDownCode -= 2;
 			break;
 		case 87://w
-			camera.keyDownCode -= 4;
+			player.eyeCam.keyDownCode -= 4;
 			break;
 		case 83://s
-			camera.keyDownCode -= 8;
+			player.eyeCam.keyDownCode -= 8;
+			break;
+		case 340://left shift
+			player.speed -= 5.0f;
 			break;
 		default:{};
 		}//switch
@@ -366,42 +343,34 @@ static void checkMouse(){
 		double deltaY = window.height*0.50 - window.mouseY;
 		glfwSetCursorPos(window.primaryWindow, window.width * 0.50, window.height * 0.50);
 		//rotation fxns take degrees, then convert in matrix_.h
-		camera.rotateCameraHorz(float(deltaX) * degreesPerPixelHorz);
-		camera.rotateCameraVert(float(deltaY) * degreesPerPixelVert);
+		player.eyeCam.rotateCameraHorz(float(deltaX) * window.degreesPerPixelHorz);
+		player.eyeCam.rotateCameraVert(float(deltaY) * window.degreesPerPixelVert);
 	}
 }
 
 void mouse_button_callback(GLFWwindow* windowP, int button, int action, int mods){
 	if (button == 0 && action == 1){
-		vector3 camToSlime = -testSlimeTwo.position() + camera.cameraPosition;//flip
-		camToSlime.normalize();
-		cout << "camToSlime X: " << camToSlime[0] << "Y: " << camToSlime[1] << "Z: " << camToSlime[2] << endl;
-		cout << "cameraLook X: " << camera.lookDirection[0] << "Y: " << camera.lookDirection[1] << "Z: " << camera.lookDirection[2] << endl;
-		float dotProd = camToSlime * camera.lookDirection;
-		cout << "Dot: " << dotProd << endl;
-		cout << "Angle: " << acosf(dotProd) * degreesPerRadian << '\n' << endl;
-
-		/*
-				vector3 perperp = camera.lookDirection % camera.perpToLookDir;
-				for (unsigned int i = 0; i < 13; i++){
-				lines.add(camera.cameraPosition + (camera.lookDirection * -1.5f));
-				lines.add((camera.cameraPosition + (camera.lookDirection * -35.0f))
+	
+			vector3 perperp = player.eyeCam.lookDirection % player.eyeCam.perpToLookDir;
+			for (unsigned int i = 0; i < 13; i++){
+				lines.add(player.eyeCam.cameraPosition + (player.eyeCam.lookDirection * -1.5f));
+				lines.add((player.eyeCam.cameraPosition + (player.eyeCam.lookDirection * -35.0f))
 				//+ camera.perpToLookDir*(cosf(i / 13.0f*6.283f) * spread)
 				//+ perperp*(sinf(i / 13.0f*6.283f) * spread));
-				+ camera.perpToLookDir*(spread - 2*rand()*spread / RAND_MAX)
+				+ player.eyeCam.perpToLookDir*(spread - 2 * rand()*spread / RAND_MAX)
 				+ perperp*(spread - 2*rand()*spread / RAND_MAX));
 				//+ vector3(2 * spread - rand()*spread / RAND_MAX,
 				//2 * spread - rand()*spread / RAND_MAX,
 				//2 * spread - rand()*spread / RAND_MAX));
-				}
-				lines.regenVertBuffer();
-				}
-				if (button == 1 && action == 1){
-				lines.verticies.clear();
-				lines.regenVertBuffer();
-				}
-				*/
-	}
+			}
+			lines.regenVertBuffer();
+		}
+		if (button == 1 && action == 1){
+			lines.verticies.clear();
+			lines.regenVertBuffer();
+		}
+				
+	
 	if (button == 1 && action == 1){
 		cout << mycount << endl;
 	}
@@ -424,19 +393,19 @@ static void window_size_callback(GLFWwindow* windowP, int widthNew, int heightNe
 	window.height = heightNew;
 	glViewport(0, 0, widthNew, heightNew);
 
-	camera.makeProjectionMatrix(FoV, (float)window.width / window.height, 0.1f, 100.0f);
+	player.eyeCam.makeProjectionMatrix(window.FoV, (float)window.width / window.height, 0.1f, 100.0f);
 	
 	
 
 	/////Necc. updates:
 	//for mouse movement:
-	degreesPerPixelVert = (FoV / window.height);
-	float d = (window.height / 2.0f) / tanf(FoV*radiansPerDegree / 2);
+	window.degreesPerPixelVert = (window.FoV / window.height);
+	float d = (window.height / 2.0f) / tanf(window.FoV*radiansPerDegree / 2);
 	float halfHorzFoV = atan((window.width / 2.0f) / d)*degreesPerRadian;
-	HorzFoV = 2 * halfHorzFoV;//saving
-	degreesPerPixelHorz = halfHorzFoV / (window.width / 2.0f); 
+	window.HorzFoV = 2 * halfHorzFoV;//saving
+	window.degreesPerPixelHorz = halfHorzFoV / (window.width / 2.0f);
 	//For view culling:
-	dotCullLimit = -cosf(HorzFoV*radiansPerDegree / 2);
+	window.dotCullLimit = -cosf(window.HorzFoV*radiansPerDegree / 2);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -447,7 +416,7 @@ void initialize(){
 ////////Shaders///////////////
 	//init skybox(first b/c it owns a Shader)
 	Skybox::skyboxInit();
-	sky = Skybox(std::string("CloudySky"));
+	sky = Skybox(std::string("CloudyBlur"));
 
 	//Create Shaders
 	pvOnlyShader.InitializeProgram("Shaders/primary.vert", "Shaders/primary.frag");//uses only PV from UBO and texture
@@ -472,8 +441,7 @@ void initialize(){
 	//glProgramUniform1i(modelTexShader.theProgram, modelTexShader.sampler, 0);
 	modelTexLitShader.sampler = modelTexShader.sampler;
 
-	//Uniforms (Global UBO and misc.)
-	//Shader::setGlobalPV_UBO(&pvOnlyShader);
+	////Uniforms (Global UBO and misc.)
 	//remember that everything which uses the UBO needs tipped off to its index
 	Shader::setGlobalPV_UBO(&pvOnlyShader);
 	glUniformBlockBinding(pvSolidColorShader.theProgram, Shader::pv_UBO_index, 1);
@@ -482,7 +450,8 @@ void initialize(){
 	glUniformBlockBinding(Skybox::cubemapShader.theProgram, Shader::pv_UBO_index, 1);
 
 	modelTexShader.pvmUniformLoc = glGetUniformLocation(modelTexShader.theProgram, "pvm");
-
+	
+	//light
 	vector3 parallelLightDir = vector3(1.1f, 1.0f, 0.4f);
 	parallelLightDir.normalize();
 	parallelLightSource = vector4(parallelLightDir, 2.0f);
@@ -491,30 +460,58 @@ void initialize(){
 	modelTexLitShader.mUniformLoc = glGetUniformLocation(modelTexLitShader.theProgram, "m");
 
 ////Camera///////////////////
-	camera = Camera(20.2f, -0.1f, 0.7f, 0.0f, 6.0f, 0.0f);
-	camera.makeProjectionMatrix(FoV, (float)window.width / window.height, 0.1f, 100.0f);
-	camera.update();
-	degreesPerPixelVert = (FoV/window.height);
-	float d = (window.height / 2.0f) / tanf(FoV*radiansPerDegree / 2); 
+	player.eyeCam = Camera(20.2f, -0.1f, 0.7f, 0.0f, 6.0f, 0.0f);
+	player.eyeCam.makeProjectionMatrix(window.FoV, (float)window.width / window.height, 0.1f, 100.0f);
+	player.eyeCam.update();
+
+	window.degreesPerPixelVert = (window.FoV / window.height);
+	float d = (window.height / 2.0f) / tanf(window.FoV*radiansPerDegree / 2);
 	float halfHorzFoV = atan((window.width / 2.0f) / d)*degreesPerRadian; 
-	HorzFoV = 2 * halfHorzFoV;
-	degreesPerPixelHorz = halfHorzFoV / (window.width / 2.0f);
-	dotCullLimit = -cosf(HorzFoV*radiansPerDegree / 2);
+	window.HorzFoV = 2 * halfHorzFoV;
+	window.degreesPerPixelHorz = halfHorzFoV / (window.width / 2.0f);
+	window.dotCullLimit = -cosf(window.HorzFoV*radiansPerDegree / 2);
 
 ////Terrain//////////////////
 //	ground.loadTerrain("Textures/Terrain/testTerrainFlat.tga", 32.0f, 32.0f, 3.5f, 16.0f);
 //	ground.loadTerrain("Textures/Terrain/terrainDiag.tga", 64.0f, 64.0f, 3.5f, 16.0f);
-	ground.loadTerrain("Textures/Terrain/testSine.tga", 128.0f, 128.0f, 4.5f, 16.0f);
-	ground.texture = textureLib::fetchTexture(resource::GRASS);
 
-///TEMP/////////
+//	ground.texture = textureLib::fetchTexture(resource::GRASS);
+	double timeStart = glfwGetTime();
+
+	ground.terrainShader = &pvOnlyShader;
+	ground.loadChunk("Textures/Terrain/totalFlat.tga", 0, 0, resource::GRASS);//loading 0,0 first might be safest
+	std::thread t1(&TerrainMap::loadChunk, &ground, "Textures/Terrain/testSine.tga", 0, 1, resource::GRASS);
+	
+	std::thread t2(&TerrainMap::loadChunk, &ground, "Textures/Terrain/terrainDiag.tga", 1, 0, resource::GRASS);
+	
+	cout << "Terrain Load: " << (glfwGetTime() - timeStart) * 1000.0 << " ms" << endl;
+	/*if (t1.joinable())
+	t1.join();
+	if (t2.joinable())
+	t2.join();
+	*/
+	t1.detach();
+	t2.detach();
+
+	//ground.loadChunk("Textures/Terrain/testSine.tga", 1, 1, resource::GRASS);
+	//ground.loadChunk("Textures/Terrain/testTerrainFlat.tga", -1, 0, resource::GRASS);
+	//ground.loadChunk("Textures/Terrain/totalFlat.tga", 0, -1, resource::GRASS);
+	//ground.loadChunk("Textures/Terrain/terrainDiag.tga", 0, 1, resource::GRASS);
+	//ground.loadChunk("Textures/Terrain/testSine.tga", 1, 0, resource::GRASS);
+	//ground.loadChunk("Textures/Terrain/Chunk512m/Tile9.tga", 0, 0, resource::GRASS);
+	//ground.loadChunk("Textures/Terrain/Chunk512m/Tile10.tga", 0, 1, resource::GRASS);
+	//ground.loadChunk("Textures/Terrain/Chunk512m/Tile13.tga", 1, 0, resource::GRASS);
+	//ground.loadChunk("Textures/Terrain/Chunk512m/Tile14.tga", 1, 1, resource::GRASS);
+
+
+////TEMP/////////
 	testSlime = WorldObject(resource::SLIME);
 	testSlimeTwo = WorldObject(resource::SLIME);
 	testError = WorldObject(resource::ROCK, resource::SPHERE); testError.modelMat[3] += 5.0f; testError.modelMat[11] -= 5.0f;
-	for(int i=0; i<10; i++){
+	for(int i=0; i<12; i++){
 		testSpheres.push_back(WorldObject(resource::SPHERE, resource::ROCK));
-		testSpheres[i].modelMat[3] -= (30.0f - 2 * rand()*30.0f / RAND_MAX);
-		testSpheres[i].modelMat[11] += (30.0f - 2 * rand()*30.0f / RAND_MAX);
+		testSpheres[i].modelMat[3] -= (20.0f - 2 * rand()*20.0f / RAND_MAX);
+		testSpheres[i].modelMat[11] += (20.0f - 2 * rand()*20.0f / RAND_MAX);
 		testSpheres[i].modelMat[7] = ( rand()*15.0f / RAND_MAX) + 7.0f;
 	}
 	
@@ -530,23 +527,29 @@ void initialize(){
 	lines.genVertBuffer();
 
 
-	deltaT = glfwGetTime() - prevTime;
+	times.deltaT = glfwGetTime() - times.prevTime;
 	//getTime ~ deltaT + prevTime
 	//newPrevTime = getTime
-	prevTime = deltaT + prevTime;
+	times.prevTime = times.deltaT + times.prevTime;
 }
 
 void exit(){
+	glDeleteSamplers(1, &pvOnlyShader.sampler);
+	glDeleteSamplers(1, &Skybox::cubemapShader.sampler);
+	glDeleteSamplers(1, &modelTexShader.sampler);
 	glDeleteShader(pvOnlyShader.theProgram);
 	glDeleteShader(pvSolidColorShader.theProgram);
 	glDeleteShader(modelTexShader.theProgram);
 	glDeleteShader(modelTexLitShader.theProgram);
-	glDeleteSamplers(1, &pvOnlyShader.sampler);
+	glDeleteShader(Skybox::cubemapShader.theProgram);
 
-	ground.surfaceMesh.cleanup();
+	//ground.surfaceMesh.cleanup(); // tied into TerrainMap destructor
 
+	Skybox::cleanAll;
 	textureLib::cleanAll();
 	modelLib::cleanAll();
+
+	//maybe wait for detached threads? worth?
 }
 int main(int argc, char **argv){
 

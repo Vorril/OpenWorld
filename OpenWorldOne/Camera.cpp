@@ -149,11 +149,11 @@ void Camera::rotateCameraVert(float angle){
 	//}
 }
 
-//More like keepUpToDate
-//Remake if necc otherwise update
-//If proj changes are moved to entirely within Camera it would
-	//make sene to not make this distinction
-	//Otherwise its useful to not remake the view mat an unnec amount of times
+/*More like keepUpToDate
+Remake if necc otherwise update
+If proj changes are moved to entirely within Camera it would
+	make sene to not make this distinction
+	Otherwise its useful to not remake the view mat an unnec amount of times*/
 void Camera::update(){
 	if (viewNeedsRemade){
 		remakeViewMatrix();
@@ -175,9 +175,6 @@ void Camera::update(){
 		Shader::updateUPO_pv(&PV_Matrix);
 		pvNeedsUpdate = false;
 
-		//may move modify: update the light vector
-		//doing this keeps it in clip space so i can use the pvm matrix for normal modification
-		//I read that is only allowed so long as pvm does not scale
 
 	}
 }

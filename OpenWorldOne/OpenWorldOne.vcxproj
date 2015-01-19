@@ -77,6 +77,7 @@
     <ClCompile Include="Camera.cpp" />
     <ClCompile Include="Library.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="MainCharacter.cpp" />
     <ClCompile Include="matrix3.cpp" />
     <ClCompile Include="matrix4.cpp" />
     <ClCompile Include="Shader.cpp" />
@@ -92,6 +93,7 @@
   <ItemGroup>
     <ClInclude Include="Camera.h" />
     <ClInclude Include="Library.h" />
+    <ClInclude Include="MainCharacter.h" />
     <ClInclude Include="matrix3.h" />
     <ClInclude Include="matrix4.h" />
     <ClInclude Include="Shader.h" />

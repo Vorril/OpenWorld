@@ -12,7 +12,7 @@ WorldObject::~WorldObject()
 
 WorldObject::WorldObject(resource enumCode){
 	model = modelLib::fetchModel(enumCode);
-	modelMat[7] = 1.5f;//testing
+	modelMat[7] = 2.9f;//testing
 	TEX_IMG = textureLib::fetchTexture(enumCode);
 
 }
