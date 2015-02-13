@@ -20,7 +20,8 @@ POSS TODO:
 -- use png or something
 */
 
-static enum resource{NULL_ENUM, DEFAULT, SLIME, SPHERE, ROCK, CUBE_FANCY, DIRT_ROUGH, BOULDER, GRASS, ROCK_ARID};//should probly have multiple enums or something
+static enum resource{NULL_ENUM, DEFAULT, SLIME, SPHERE, ROCK, CUBE_FANCY, DIRT_ROUGH, BOULDER, GRASS, ROCK_ARID, DIAMOND_SML};//should probly have multiple enums or something
+
 
 namespace textureLib{
 	typedef std::tuple<GLuint, bool, const char*> textureUnit;

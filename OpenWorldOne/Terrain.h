@@ -25,6 +25,11 @@ public:
 	Terrain();
 	~Terrain();
 
+	//static vector<GLushort> indices128x128;
+	//static vector<GLfloat> UV_VBO_128;
+	static GLuint indicesElementArr;
+	static GLuint UV_VBO_128;
+
 	unsigned char * terrainLinear;
 
 	std::pair<int, int> chunkCoords;
@@ -33,7 +38,7 @@ public:
 	GLuint texture;
 	vec4VBO surfaceMesh;
 
-//Offsets are by default -1 which will offset to center i.e. -1/2 width and length translations
+	//Offsets are by default -1 which will offset to center i.e. -1/2 width and length translations
 	//UPDATE: create through a terrainMap 
 	void loadTerrain(const char* file, float unitsWide, float unitsLength, float maxDepth,
 					float textureRepeats =1.0f, float xOffset = -1.0f, float zOffset = -1.0f);
@@ -78,12 +83,19 @@ public:
 	void draw(const Camera* cam);//cull consideration: are we standing on the chunk || is any corner of chunk in FoV(prob wrong)?
 	float getLocalHeight(float worldX, float worldZ);
 
+	
+	bool keepRunning = true;
+	//Function for a thread to constantly monitor for new loads based on proximity
+	//Detach then keepRunning = true to end thread
+	void monitorLoading(const Camera* cam);
+
+	void createConstantArrays128();
 private:
 	//vector<bool> chunkExists;
 	//some misc immutables, should/could do these with macros. These are assuming/forcing square chunks
 	float const chunkSize = 64.0f; int const chunkSizei = 64;
 	float const absOffset = -32.0f; int const absOffseti = -32;
-	float const absDepth = 5.0f;
+	float const absDepth = 20.0f; int const defaultTexRepeats = 8.0f;
 
 	//The storage is a (possibly sparse) grid of chunks// use a map with [i] as key// dynamically update when the map grows (probably remake the map)
 	//terrainLinear[(int)((x)*height + y)]
@@ -91,6 +103,7 @@ private:
 	int chunksTall = 1; int lowestY = 0; int highestY = 0;
 
 	int linearPosition(int x, int y);
+	int adjustedLinearPosition(int x, int y);
 	int linearPosition(std::pair<int, int> chunkCoordpair);
 
 	//chunks are loaded multithreaded but the ogl context thread must do the buffering! :

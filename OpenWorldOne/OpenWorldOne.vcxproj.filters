@@ -19,6 +19,12 @@
     <Filter Include="Source Files\Math">
       <UniqueIdentifier>{96718ace-3de1-46b6-a03e-fecbdeff0834}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Header Files\WorldObjects">
+      <UniqueIdentifier>{34eee1ca-3101-4868-8df1-6213f1fb757c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\WorldObjects">
+      <UniqueIdentifier>{9010c495-d40c-4387-bf3c-21ea1b6fd182}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">
@@ -57,14 +63,17 @@
     <ClCompile Include="Terrain.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="WorldObject.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="Skybox.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="MainCharacter.cpp">
       <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="WorldObject.cpp">
+      <Filter>Source Files\WorldObjects</Filter>
+    </ClCompile>
+    <ClCompile Include="SlimeWO.cpp">
+      <Filter>Source Files\WorldObjects</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -101,14 +110,20 @@
     <ClInclude Include="Terrain.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="WorldObject.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="Skybox.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="MainCharacter.h">
       <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="WorldObject.h">
+      <Filter>Header Files\WorldObjects</Filter>
+    </ClInclude>
+    <ClInclude Include="SlimeWO.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="UtilsWO.h">
+      <Filter>Header Files\WorldObjects</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

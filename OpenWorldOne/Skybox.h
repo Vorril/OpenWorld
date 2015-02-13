@@ -12,7 +12,7 @@ public:
 	Skybox(std::string SBdir);
 	~Skybox();
 	static void cleanAll();
-
+	//a reference list to clean textures on exit
 	static std::vector<Skybox*> referenceCounts;
 
 	static GLfloat* cube_vertices;
@@ -28,7 +28,7 @@ public:
 
 	GLuint cubeMapTex;
 
-	//draw it using the requisite shader. Should clear teh depth buffer afterwards
+	//draw it using the requisite shader. Should clear the depth buffer afterwards
 	void drawSB(vector3 cameraPos);
 
 private:

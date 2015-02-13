@@ -2,6 +2,11 @@
 
 #define terrain(x, y) terrainLinear[(int)((x)*height + y)]
 
+//static defs
+//std::vector<GLushort> Terrain::indices128x128 = {};
+//std::vector<GLfloat> Terrain::UV_VBO_128 = {};
+GLuint Terrain::indicesElementArr = 0;
+GLuint Terrain::UV_VBO_128 = 0;
 
 Terrain::Terrain()
 {
@@ -30,10 +35,20 @@ void Terrain::loadTerrain(const char* file, float unitsWide, float unitsLength, 
 	//array[i][k] = array[i * width + k];								   //    |  /  |
 	float widthf = (float)width;  										   //    2.5---6
 	float heightf = (float)height;
-	
+
+
+
+	for (int w = 0; w < width; w++){ //w = x = width               
+		for (int h = 0; h < height; h++){  //h = y = height
+			surfaceMesh.add(unitsWide * (w / (widthf - 1)) + xOffset, terrain(w, h) * maxDepth / 255.0f, unitsLength * (h / (heightf - 1)) + zOffset);
+			//surfaceMesh.texCoords.push_back(vector2(w*(textureRepeats / (widthf - 1)), h*(textureRepeats / (heightf - 1))));
+			//Tex coords will be shared by everything as well now, unless repeats varies
+		}
+	}
+	/*
 	for (int w = 0; w < width-1; w++){ //w = x = width               
 		for (int h = 0; h < height-1; h++){  //h = y = height
-		//someday using indices would be really nice here
+
 			surfaceMesh.add(unitsWide * (w / (widthf-1)) + xOffset, terrain(w, h) * maxDepth / 255.0f, unitsLength * (h / (heightf-1)) + zOffset);
 			surfaceMesh.texCoords.push_back(vector2(w*(textureRepeats / (widthf-1)), h*(textureRepeats / (heightf-1))));
 			surfaceMesh.add(unitsWide * (w / (widthf-1)) + xOffset, terrain(w, h+1) * maxDepth / 255.0f, unitsLength * ((h+1) / (heightf-1)) + zOffset);
@@ -46,8 +61,9 @@ void Terrain::loadTerrain(const char* file, float unitsWide, float unitsLength, 
 			surfaceMesh.texCoords.push_back(surfaceMesh.texCoords[surfaceMesh.texCoords.size() - 3]);//repeating
 			surfaceMesh.add(unitsWide * ((w + 1) / (widthf-1)) + xOffset, terrain(w + 1, h + 1) * maxDepth / 255.0f, unitsLength * ((h + 1) / (heightf-1)) + zOffset);
 			surfaceMesh.texCoords.push_back(vector2((w + 1)*(textureRepeats / (widthf-1)), (h + 1)*(textureRepeats / (heightf-1))));
-		}//trying widthf to (widthf-1) // worked
-	}
+	 
+	}//trying widthf to (widthf-1) // worked
+	}*/
 	//assign vars to the object, some of these will be redundant in the push to force sq chunks
 	xGridUnits = width;
 	zGridUnits = height;
@@ -64,7 +80,6 @@ void Terrain::loadTerrain(const char* file, float unitsWide, float unitsLength, 
 
 	//TODO:
 	//normal calcs
-	//Multithread this
 
 	//delete[] terrainLinear;//may be supposed to call soil_free_image_data(terrainLinear)
 
@@ -110,8 +125,22 @@ float Terrain::getLocalHeight(float worldX, float worldZ){
 }
 
 void Terrain::draw(){
-	
-	
+	//can stll minimize gl calls with some extraction to terrainMap draw()
+	glBindTexture(GL_TEXTURE_2D, texture);
+
+	//Bind the verticies buffer
+	glBindBuffer(GL_ARRAY_BUFFER, surfaceMesh.VERT_BUFF_ID);
+	glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 0, (void*)0);
+	//Bind the uv coords buffer
+	//glBindBuffer(GL_ARRAY_BUFFER, Terrain::UV_VBO_128);
+	//glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 0, (void*)0);
+
+	//moving to other draw method
+	//glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indicesElementArr);
+
+	glDrawElements(GL_TRIANGLE_STRIP, 32764, GL_UNSIGNED_SHORT, 0);
+
+	/* // Pre elements array
 	glBindTexture(GL_TEXTURE_2D, texture);
 
 	//Bind the verticies buffer
@@ -123,7 +152,7 @@ void Terrain::draw(){
 
 	//glBindTexture(GL_TEXTURE_2D, IMG_ID);
 	glDrawArrays(GL_TRIANGLES, 0, surfaceMesh.verticies.size());
-
+*/
 }
 
 
@@ -175,11 +204,12 @@ void TerrainMap::loadChunk(const char* htMap, int chunkX, int chunkY, resource T
 			//this is all sort of assuming 0,0 is loaded first which is bad
 			mapChunks[linearPosition(chunk->chunkCoords.first - lowestX, chunk->chunkCoords.second - lowestY)] = chunk;
 			chunks.push_back(chunk);
-			mutexLock.unlock();
 			chunksNeedGLbuffered.push_back(chunk);
+			
+			needsBuffering = true;
+			mutexLock.unlock();
 			// !- Thread safe again -!
 
-			needsBuffering = true;
 			return;
 		}
 	}//it was in bounds of the extremes
@@ -221,10 +251,12 @@ void TerrainMap::loadChunk(const char* htMap, int chunkX, int chunkY, resource T
 		mapChunks[linearPosition(chunkPointer->chunkCoords.first-lowestX, chunkPointer->chunkCoords.second-lowestY)] = chunkPointer;//this is a map assignment syntax
 		}
 		chunksNeedGLbuffered.push_back(chunk);
+		needsBuffering = true;
+
 		mutexLock.unlock();
 		  // !- Thread safe again -!
 
-		needsBuffering = true;
+		
 		return;
 		//pre MT code
 			/*
@@ -287,16 +319,17 @@ void TerrainMap::loadChunk(const char* htMap, int chunkX, int chunkY, resource T
 			}*/
 }
 
-//TODO: CULL and ELEMENT ARRAY IT UP
 void TerrainMap::draw(const Camera* cam){
 	//Check if all the data is buffered: (pretty inconsistent need but abs. necc.)
+	if (needsBuffering){
 	for (Terrain* terrPointer : chunksNeedGLbuffered){
+		//consider only doing 1 or 2 at a time
 		terrPointer->surfaceMesh.genVertBuffer(GL_STATIC_DRAW);//draw and draw arb have same code
 		terrPointer->surfaceMesh.genUVBuffer();
 	}
 	chunksNeedGLbuffered.clear();
 	needsBuffering = false;
-
+	}
 
 	glUseProgram(terrainShader->theProgram);
 	glBindSampler(0, terrainShader->sampler);
@@ -306,10 +339,16 @@ void TerrainMap::draw(const Camera* cam){
 
 	glActiveTexture(GL_TEXTURE0);
 
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, Terrain::indicesElementArr);
+
+	glBindBuffer(GL_ARRAY_BUFFER, Terrain::UV_VBO_128);
+	glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 0, (void*)0);
+
 	for (Terrain* eachChunk : chunks){
 		eachChunk->draw();
 	}
 
+	//bind 0 here for safety?
 	glDisableVertexAttribArray(0);
 	glDisableVertexAttribArray(1);
 
@@ -326,9 +365,7 @@ float TerrainMap::getLocalHeight(float worldX, float worldZ){
 	int xChunkCoord = (int)floorf(terrSpaceX / chunkSize);
 	int zChunkCoord = (int)floorf(terrSpaceZ / chunkSize);//could precalculate this into a variable when they get updated
 
-	//return mapChunks[linearPosition(xChunkCoord + lowestX, zChunkCoord + lowestY)]->getLocalHeight(worldX, worldZ);
-	//  ^^ //turns out that offset is unnecc. b/c world coordinates are based off chunk coords in the first place ^^
-
+	
 	/*The super safe way
 	//should wrap this in a 'bool careful' with a default param if ever seemes necc.
 	int key = linearPosition(xChunkCoord - lowestX, zChunkCoord - lowestY);
@@ -341,10 +378,122 @@ float TerrainMap::getLocalHeight(float worldX, float worldZ){
 	return mapChunks[linearPosition(xChunkCoord - lowestX, zChunkCoord - lowestY)]->getLocalHeight(worldX, worldZ);
 }
 
+void TerrainMap::createConstantArrays128(){
+	vector<GLushort> indices128x128;
+	vector<GLfloat> UV_VBO;
+
+	int stripsRequired = 127;//y - 1
+	int degenTrisReq = 127 * 2;//numstrips * 2
+	int vertsPerStrip = 127 * 2; //x*2
+
+	for (int i = 0; i < 127; i++){//each strip
+		for (int k = 0; k < 128; k++){ //each pair in the tri strip
+			indices128x128.push_back(((i + 1) * 128) + k);   //127 128 129 130 // Reverse these two lines to 
+			indices128x128.push_back((i * 128) + k);       // 0   1   2   3  // switch the order CW/CCW face winding
+		}
+		//now insert 2 degens // 2 to maintain front/back winding
+		if (i < 126){ // no need at end
+			indices128x128.push_back((i)* 128 + (127)); //  (i) -> (i+1)  These changes to switch
+			indices128x128.push_back((i + 2) * 128);     // (i+2) -> (i+1) CW/CCW face winding
+		}
+	}
+
+	//cout << indices128x128.size();
+
+	glGenBuffers(1, &Terrain::indicesElementArr);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, Terrain::indicesElementArr);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(GLushort)* 32764, indices128x128.data(), GL_STATIC_DRAW);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+
+	//now the UVs
+
+	for (int w = 0; w < 128; w++){ //w = x = width               
+		for (int h = 0; h < 128; h++){  //h = y = height
+			UV_VBO.push_back(w*(defaultTexRepeats / (127.0f)));
+			UV_VBO.push_back(h*(defaultTexRepeats / (127.0f)));
+		}
+	}
+
+	glGenBuffers(1, &Terrain::UV_VBO_128); // most important 
+	glBindBuffer(GL_ARRAY_BUFFER, Terrain::UV_VBO_128);
+	glBufferData(GL_ARRAY_BUFFER,  sizeof(float)* UV_VBO.size(),
+		UV_VBO.data(),
+		GL_STATIC_DRAW);
+
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+}
+
 int TerrainMap::linearPosition(int x, int y){
 	return (x*chunksTall) + y;
 }
 
+int TerrainMap::adjustedLinearPosition(int x, int y){
+	return linearPosition(x - lowestX, y - lowestY);
+}
+
 int TerrainMap::linearPosition(std::pair<int, int> chunkCoordpair){
 	return linearPosition(chunkCoordpair.first, chunkCoordpair.second);
+}
+
+
+
+void TerrainMap::monitorLoading(const Camera* cam){
+	int xChunkCoord;
+	int zChunkCoord;
+	float terrSpaceX;
+	float terrSpaceZ;
+
+	std::chrono::milliseconds duration(650);
+
+	while (keepRunning){
+		terrSpaceX = cam->cameraPosition[0] - absOffset;
+		terrSpaceZ = cam->cameraPosition[2] - absOffset;
+
+		//0-63.999 -> 0 //64-127.999 -> 1 //128->191.999 -> 3
+		//-64.0 -0.001 -> -1 floor should still be correct
+		xChunkCoord = (int)floorf(terrSpaceX / chunkSize);
+		zChunkCoord = (int)floorf(terrSpaceZ / chunkSize);
+
+		//for now just check all neighbors
+		if (xChunkCoord > -2 && xChunkCoord < 3 && zChunkCoord > -2 && zChunkCoord < 3){
+			//TODO make terrain for it to load and lookup corr thing to load
+			int xCoord = xChunkCoord + 1;
+			int zCoord = zChunkCoord + 1;
+		if (mapChunks.count(adjustedLinearPosition(xChunkCoord + 1, zChunkCoord)) == 0){
+			std::thread t1(&TerrainMap::loadChunk, this, "Textures/Terrain/smallFlat.tga", xChunkCoord + 1, zChunkCoord, resource::GRASS);
+			t1.detach();
+		}
+		if (mapChunks.count(adjustedLinearPosition(xChunkCoord, zChunkCoord + 1)) == 0){
+			std::thread t2(&TerrainMap::loadChunk, this, "Textures/Terrain/smallFlat.tga", xChunkCoord, zChunkCoord + 1, resource::GRASS);
+			t2.detach();
+		}
+		if (mapChunks.count(adjustedLinearPosition(xChunkCoord - 1, zChunkCoord)) == 0){
+			std::thread t3(&TerrainMap::loadChunk, this, "Textures/Terrain/smallFlat.tga", xChunkCoord - 1, zChunkCoord, resource::GRASS);
+			t3.detach();
+		}
+		if (mapChunks.count(adjustedLinearPosition(xChunkCoord, zChunkCoord - 1)) == 0){
+			std::thread t4(&TerrainMap::loadChunk, this, "Textures/Terrain/smallFlat.tga", xChunkCoord, zChunkCoord - 1, resource::GRASS);
+			t4.detach();
+		}
+		if (mapChunks.count(adjustedLinearPosition(xChunkCoord + 1, zChunkCoord + 1)) == 0){
+			std::thread t5(&TerrainMap::loadChunk, this, "Textures/Terrain/smallFlat.tga", xChunkCoord + 1, zChunkCoord + 1, resource::GRASS);
+			t5.detach();
+		}
+		if (mapChunks.count(adjustedLinearPosition(xChunkCoord + 1, zChunkCoord - 1)) == 0){
+			std::thread t6(&TerrainMap::loadChunk, this, "Textures/Terrain/smallFlat.tga", xChunkCoord + 1, zChunkCoord - 1, resource::GRASS);
+			t6.detach();
+		}
+		if (mapChunks.count(adjustedLinearPosition(xChunkCoord - 1, zChunkCoord + 1)) == 0){
+			std::thread t7(&TerrainMap::loadChunk, this, "Textures/Terrain/smallFlat.tga", xChunkCoord - 1, zChunkCoord + 1, resource::GRASS);
+			t7.detach();
+		}
+		if (mapChunks.count(adjustedLinearPosition(xChunkCoord - 1, zChunkCoord - 1)) == 0){
+			std::thread t8(&TerrainMap::loadChunk, this, "Textures/Terrain/smallFlat.tga", xChunkCoord - 1, zChunkCoord - 1, resource::GRASS);
+			t8.detach();
+		}
+}
+
+		std::this_thread::sleep_for(duration);
+	}//while running
 }

@@ -1,6 +1,6 @@
 #include <iostream>
-#include <GL/glew.h>//using the d library nd dll
-#include <GL/glfw3.h> // includes windows.h
+#include <Dependencies/GL/glew.h>//using the d library nd dll
+#include <Dependencies/GL/glfw3.h> // includes windows.h
 #include <math.h>
 
 #include <thread>
@@ -12,7 +12,6 @@
 #include <Terrain.h> //should probably moce to world
 #include <Skybox.h>
 #include <MainCharacter.h> // includes cam and terrain
-
 /*
 TODO
 -- Consider terrain view culling
@@ -25,9 +24,9 @@ TODO
 -- Abstract base classes for levels and or objects
 -- Do something with misc function placement
 -- Make a physics function/loop
--- Use element array with terrain, every chunk has the same element array
 -- Restrict jump movement
--- Keep pulling unecc. out of main
+-- Keep pulling unecc. out of main//use world to do this >!>!
+-- Just use inheritance for worldobjects but keep lib for common things
 */
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -54,6 +53,7 @@ WorldObject testError;
 WorldObject testCube;
 WorldObject testBoulder;
 std::vector<WorldObject> testSpheres;
+std::vector<WorldObject> diamonds;
 
 bool tbool3 = false;
 bool tbool2 = true;
@@ -77,6 +77,7 @@ MainCharacter player;
 //Shaders
 Shader pvOnlyShader; // could hold shaders elsewhere
 Shader pvSolidColorShader; //inside inherited classes
+Shader pvmSolidColorShader; 
 Shader modelTexShader;
 Shader modelTexLitShader;
 
@@ -102,11 +103,6 @@ struct windowData{ //Data for a window, width, height,  and mouse coords etc
 GLFWmonitor* myMonitor = nullptr;
 
 MainCharacter::coreTimer times; 
-//struct coreTimer{
-//	double prevTime = 0.0;
-//	double deltaT = 0.0;
-//};
-
 
 
 //Misc functions should think of a good place
@@ -193,32 +189,31 @@ void display(){
 	glUniformMatrix4fv(modelTexLitShader.mUniformLoc, 1, GL_TRUE, testSlimeTwo.modelMat.matrix);
 	testSlimeTwo.drawBound();
 
-	//new shader
-	testError.bindProgram(modelTexShader);
-	pvmMat = player.eyeCam.PV_Matrix * testError.modelMat;
-	glUniformMatrix4fv(modelTexShader.pvmUniformLoc, 1, GL_TRUE, pvmMat.matrix);
-	testError.drawBound();
+	testError.quickDraw();
 
 	mycount = 0;
-	testSpheres[0].bindTexture();
+	testSpheres[0].bind();
 	for (WorldObject &sphere : testSpheres){
 		if (inFrame(sphere.position())){
 			mycount++;
-			pvmMat = player.eyeCam.PV_Matrix * sphere.modelMat;
-		glUniformMatrix4fv(modelTexShader.pvmUniformLoc, 1, GL_TRUE, pvmMat.matrix);
-		sphere.drawBound();
+			sphere.draw();
 		}
 	}
 
-	testCube.bindTexture();
-	pvmMat = player.eyeCam.PV_Matrix * testCube.modelMat;
-	glUniformMatrix4fv(modelTexShader.pvmUniformLoc, 1, GL_TRUE, pvmMat.matrix);
-	testCube.drawBound();
+	
 
-	testBoulder.bindTexture();
-	pvmMat = player.eyeCam.PV_Matrix * testBoulder.modelMat;
-	glUniformMatrix4fv(modelTexShader.pvmUniformLoc, 1, GL_TRUE, pvmMat.matrix);
-	testBoulder.drawBound();
+	testBoulder.bind(); 
+	testBoulder.draw();
+
+	glUseProgram(pvmSolidColorShader.theProgram);
+	for (WorldObject &dia : diamonds){
+		pvmMat = player.eyeCam.PV_Matrix * dia.modelMat;
+		glUniformMatrix4fv(pvmSolidColorShader.pvmUniformLoc, 1, GL_TRUE, pvmMat.matrix);
+		glBindBuffer(GL_ARRAY_BUFFER, dia.model->VERT_BUFF_ID);
+		glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 0, (void*)0);
+		glDrawArrays(GL_TRIANGLES, 0, dia.model->verticies.size());
+	}
+
 
 	if (tbool)
 		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);///!!!//TEMP//!!!///
@@ -228,7 +223,6 @@ void display(){
 	glDepthFunc(GL_LEQUAL);  
 	sky.drawSB(player.eyeCam.cameraPosition);
 	glDepthFunc(GL_LESS); 
-
 
 
 //put these somewhere better:
@@ -278,7 +272,7 @@ static void key_callback(GLFWwindow* windowP, int key, int scancode, int action,
 		case 69:{//e
 			double timeStart = glfwGetTime();
 
-			std::thread t1(&TerrainMap::loadChunk, &ground, "Textures/Terrain/testSine.tga", 1, 1, resource::GRASS);
+			std::thread t1(&TerrainMap::loadChunk, &ground, "Textures/Terrain/hill.tga", 1, 1, resource::GRASS);
 			t1.detach();
 
 			cout << "Terrain Load: " << (glfwGetTime() - timeStart) * 1000.0 << " ms" << endl;
@@ -377,14 +371,14 @@ void mouse_button_callback(GLFWwindow* windowP, int button, int action, int mods
 }
 
 void scroll_callback(GLFWwindow* windowP, double xpos, double ypos){
-	//gravity += ypos * 0.1; 
+	gravity += ypos * 0.1; 
 	//cout << spread << endl;
 	//parallelLightSource[3] += (float)ypos*0.1f;
 	//if (parallelLightSource[3] < 0.0f) parallelLightSource[3] = 0.0f;
 	//calc in clip space:
-	parallelLightSource[3] += (float)ypos*0.1f;
-		if (parallelLightSource[3] < 0.0f) parallelLightSource[3] = 0.0f;
-		Shader::updateUPO_light(parallelLightSource);
+	//parallelLightSource[3] += (float)ypos*0.1f;
+		//if (parallelLightSource[3] < 0.0f) parallelLightSource[3] = 0.0f;
+		//Shader::updateUPO_light(parallelLightSource);
 	
 }
 
@@ -419,20 +413,19 @@ void initialize(){
 	sky = Skybox(std::string("CloudyBlur"));
 
 	//Create Shaders
-	pvOnlyShader.InitializeProgram("Shaders/primary.vert", "Shaders/primary.frag");//uses only PV from UBO and texture
-	modelTexShader.InitializeProgram("Shaders/modelTex.vert", "Shaders/modelTex.frag");//uses mpv and texture
+	pvOnlyShader.InitializeProgram("Shaders/primary.vert", "Shaders/primary.frag");//uses only PV from UBO and texture//the ground shader
+	modelTexShader.InitializeProgram("Shaders/modelTex.vert", "Shaders/modelTex.frag");//uses mpv and texture//most obects
 	modelTexLitShader.InitializeProgram("Shaders/modelTexLit.vert", "Shaders/modelTexLit.frag");//uses mpv and texture and modelmat
 	pvSolidColorShader.InitializeProgram("Shaders/solidColor.vert", "Shaders/solidColor.frag");//uses only pv from UBO and is solid red
+	pvmSolidColorShader.InitializeProgram("Shaders/pvmSolidColor.vert", "Shaders/pvmSolidColor.frag");//same but uses pvm
 	//Create Sampler(s)
 	pvOnlyShader.sampler = glGetUniformLocation(pvOnlyShader.theProgram, "diffuseSampler");
-	//glSamplerParameteri(pvOnlyShader.sampler, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-	//glSamplerParameteri(pvOnlyShader.sampler, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 	glSamplerParameteri(pvOnlyShader.sampler, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glSamplerParameteri(pvOnlyShader.sampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
 	glSamplerParameteri(pvOnlyShader.sampler, GL_TEXTURE_WRAP_S, GL_REPEAT);
 	glSamplerParameteri(pvOnlyShader.sampler, GL_TEXTURE_WRAP_T, GL_REPEAT);
 	glSamplerParameterf(pvOnlyShader.sampler, GL_TEXTURE_MAX_ANISOTROPY_EXT, 4.0f);
-	//glProgramUniform1i(pvOnlyShader.theProgram, pvOnlyShader.sampler, 0);
+	
 	modelTexShader.sampler = glGetUniformLocation(modelTexShader.theProgram, "diffuseSampler");
 	glSamplerParameteri(modelTexShader.sampler, GL_TEXTURE_MAG_FILTER, GL_LINEAR);//minmaps are minification only
 	glSamplerParameteri(modelTexShader.sampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
@@ -450,14 +443,15 @@ void initialize(){
 	glUniformBlockBinding(Skybox::cubemapShader.theProgram, Shader::pv_UBO_index, 1);
 
 	modelTexShader.pvmUniformLoc = glGetUniformLocation(modelTexShader.theProgram, "pvm");
+	pvmSolidColorShader.pvmUniformLoc = glGetUniformLocation(modelTexShader.theProgram, "pvm");
+	modelTexLitShader.pvmUniformLoc = glGetUniformLocation(modelTexLitShader.theProgram, "pvm");
+	modelTexLitShader.mUniformLoc = glGetUniformLocation(modelTexLitShader.theProgram, "m");
 	
 	//light
 	vector3 parallelLightDir = vector3(1.1f, 1.0f, 0.4f);
 	parallelLightDir.normalize();
 	parallelLightSource = vector4(parallelLightDir, 2.0f);
 	Shader::updateUPO_light(parallelLightSource);
-	modelTexLitShader.pvmUniformLoc = glGetUniformLocation(modelTexLitShader.theProgram, "pvm");
-	modelTexLitShader.mUniformLoc = glGetUniformLocation(modelTexLitShader.theProgram, "m");
 
 ////Camera///////////////////
 	player.eyeCam = Camera(20.2f, -0.1f, 0.7f, 0.0f, 6.0f, 0.0f);
@@ -472,53 +466,53 @@ void initialize(){
 	window.dotCullLimit = -cosf(window.HorzFoV*radiansPerDegree / 2);
 
 ////Terrain//////////////////
-//	ground.loadTerrain("Textures/Terrain/testTerrainFlat.tga", 32.0f, 32.0f, 3.5f, 16.0f);
-//	ground.loadTerrain("Textures/Terrain/terrainDiag.tga", 64.0f, 64.0f, 3.5f, 16.0f);
-
-//	ground.texture = textureLib::fetchTexture(resource::GRASS);
-	double timeStart = glfwGetTime();
+	ground.createConstantArrays128();//TODO maybe make this variable, probably clear the mem after GPU upload
 
 	ground.terrainShader = &pvOnlyShader;
-	ground.loadChunk("Textures/Terrain/totalFlat.tga", 0, 0, resource::GRASS);//loading 0,0 first might be safest
-	std::thread t1(&TerrainMap::loadChunk, &ground, "Textures/Terrain/testSine.tga", 0, 1, resource::GRASS);
-	
-	std::thread t2(&TerrainMap::loadChunk, &ground, "Textures/Terrain/terrainDiag.tga", 1, 0, resource::GRASS);
-	
-	cout << "Terrain Load: " << (glfwGetTime() - timeStart) * 1000.0 << " ms" << endl;
-	/*if (t1.joinable())
+	ground.loadChunk("Textures/Terrain/MapChunks/tile5.tga", 0, 0, resource::GRASS);//loading 0,0 first might be safest
+	std::thread t1(&TerrainMap::loadChunk, &ground, "Textures/Terrain/MapChunks/tile6.tga", 0, 1, resource::GRASS);
+	t1.detach();
+	std::thread t2(&TerrainMap::loadChunk, &ground, "Textures/Terrain/MapChunks/tile9.tga", 1, 0, resource::GRASS);
+	t2.detach();
+	std::thread t3(&TerrainMap::loadChunk, &ground, "Textures/Terrain/MapChunks/tile10.tga", 1, 1, resource::GRASS);
+	t3.detach();
+
+	/*
+	if (t1.joinable())
 	t1.join();
 	if (t2.joinable())
 	t2.join();
-	*/
-	t1.detach();
-	t2.detach();
+	if (t3.joinable())
+		t3.join();
+*/
+	//ground.loadChunk("Textures/Terrain/MapChunks/tile7.tga", 0, 2, resource::GRASS);
+	//ground.loadChunk("Textures/Terrain/MapChunks/tile11.tga", 1, 2, resource::GRASS);
+	//std::thread tTrack(&TerrainMap::monitorLoading, &ground, &player.eyeCam);
+	//tTrack.detach();
 
-	//ground.loadChunk("Textures/Terrain/testSine.tga", 1, 1, resource::GRASS);
-	//ground.loadChunk("Textures/Terrain/testTerrainFlat.tga", -1, 0, resource::GRASS);
-	//ground.loadChunk("Textures/Terrain/totalFlat.tga", 0, -1, resource::GRASS);
-	//ground.loadChunk("Textures/Terrain/terrainDiag.tga", 0, 1, resource::GRASS);
-	//ground.loadChunk("Textures/Terrain/testSine.tga", 1, 0, resource::GRASS);
-	//ground.loadChunk("Textures/Terrain/Chunk512m/Tile9.tga", 0, 0, resource::GRASS);
-	//ground.loadChunk("Textures/Terrain/Chunk512m/Tile10.tga", 0, 1, resource::GRASS);
-	//ground.loadChunk("Textures/Terrain/Chunk512m/Tile13.tga", 1, 0, resource::GRASS);
-	//ground.loadChunk("Textures/Terrain/Chunk512m/Tile14.tga", 1, 1, resource::GRASS);
+
+////Misc. sets////////
+	WorldObject::basicShader = &modelTexShader;
+	WorldObject::pvMat = &player.eyeCam.PV_Matrix;
 
 
 ////TEMP/////////
-	testSlime = WorldObject(resource::SLIME);
+	testSlime = WorldObject(resource::SLIME); 
+	testSlime.modelMat[7] = ground.getLocalHeight(testSlime.modelMat[7], testSlime.modelMat[11]);
 	testSlimeTwo = WorldObject(resource::SLIME);
+	testSlimeTwo.modelMat[7] = ground.getLocalHeight(testSlimeTwo.modelMat[7], testSlimeTwo.modelMat[11]);
 	testError = WorldObject(resource::ROCK, resource::SPHERE); testError.modelMat[3] += 5.0f; testError.modelMat[11] -= 5.0f;
-	for(int i=0; i<12; i++){
-		testSpheres.push_back(WorldObject(resource::SPHERE, resource::ROCK));
+	for(int i=0; i<10; i++){
+		testSpheres.push_back(WorldObject(resource::SPHERE, resource::ROCK));//doesnt call new?
 		testSpheres[i].modelMat[3] -= (20.0f - 2 * rand()*20.0f / RAND_MAX);
 		testSpheres[i].modelMat[11] += (20.0f - 2 * rand()*20.0f / RAND_MAX);
 		testSpheres[i].modelMat[7] = ( rand()*15.0f / RAND_MAX) + 7.0f;
 	}
 	
-	testCube = WorldObject(CUBE_FANCY, resource::DEFAULT);
-	testCube.modelMat[3] = 5.0f;
-	testCube.modelMat[7] = 5.0f;
-	testCube.modelMat[11] = 5.0f;
+	diamonds.push_back(WorldObject(resource::DIAMOND_SML));
+	diamonds[0].modelMat[7] = ground.getLocalHeight(-5.0f, -5.0f);
+	diamonds[0].modelMat[3] = -5.0f;
+	diamonds[0].modelMat[11] = -5.0f;
 
 	testBoulder = WorldObject(resource::BOULDER, resource::ROCK_ARID);
 	testBoulder.modelMat[3] = testBoulder.modelMat[11] = 10.0f;
@@ -534,6 +528,8 @@ void initialize(){
 }
 
 void exit(){
+	ground.keepRunning = false;//signal thread to exit
+
 	glDeleteSamplers(1, &pvOnlyShader.sampler);
 	glDeleteSamplers(1, &Skybox::cubemapShader.sampler);
 	glDeleteSamplers(1, &modelTexShader.sampler);
@@ -542,6 +538,7 @@ void exit(){
 	glDeleteShader(modelTexShader.theProgram);
 	glDeleteShader(modelTexLitShader.theProgram);
 	glDeleteShader(Skybox::cubemapShader.theProgram);
+	glDeleteShader(pvmSolidColorShader.theProgram);
 
 	//ground.surfaceMesh.cleanup(); // tied into TerrainMap destructor
 
@@ -605,8 +602,11 @@ int main(int argc, char **argv){
 	glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
 
 	glfwSwapInterval(1);
+	
+	cout << "GL version: " << glGetString(GL_VERSION) << endl << "GLSL version: " << glGetString(GL_SHADING_LANGUAGE_VERSION) << endl;
 
 	initialize();
+
 	while (!glfwWindowShouldClose(window.primaryWindow))
 	{
 

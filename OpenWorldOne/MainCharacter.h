@@ -18,7 +18,7 @@ public:
 	float velocity = 0.0f;
 	float eyeHeight = 2.25f;
 	bool jumping = false;
-	bool boundMovement = false;
+	bool boundMovement = true;
 
 
 	struct coreTimer{

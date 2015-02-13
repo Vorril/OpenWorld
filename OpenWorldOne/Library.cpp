@@ -5,6 +5,7 @@
 #define getVBO(v) std::get<0>(v)
 #define getTexture(v) std::get<0>(v)
 
+//fwd declarations
 static void checkModel(modelLib::modelUnit* model);
 static bool loadObj(const char* filePath, vec4VBO* loadToMe);
 static GLuint checkTexture(textureLib::textureUnit *texture);
@@ -69,6 +70,7 @@ std::tuple<vec4VBO*, bool, const char*> Slime = modelLib::modelUnit(nullptr, fal
 std::tuple<vec4VBO*, bool, const char*> Sphere = modelLib::modelUnit(nullptr, false, "Models/sphere.mdl");
 std::tuple<vec4VBO*, bool, const char*> CubeFancy = modelLib::modelUnit(nullptr, false, "Models/cubeEdges.mdl");
 std::tuple<vec4VBO*, bool, const char*> Boulder = modelLib::modelUnit(nullptr, false, "Models/boulder1.mdl");
+std::tuple<vec4VBO*, bool, const char*> DiamondSmall = modelLib::modelUnit(nullptr, false, "Models/smallDiamond.mdl");
 
 	vec4VBO* fetchModel(resource enumCode){
 		//dont call the object class should interact with this
@@ -88,6 +90,9 @@ std::tuple<vec4VBO*, bool, const char*> Boulder = modelLib::modelUnit(nullptr, f
 		case BOULDER:
 			checkModel(&Boulder);
 			return getVBO(Boulder);
+		case DIAMOND_SML:
+			checkModel(&DiamondSmall);
+			return getVBO(DiamondSmall);
 		default:
 			checkModel(&Default);
 			return getVBO(Default);
